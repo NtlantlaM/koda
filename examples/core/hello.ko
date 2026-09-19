@@ -1,0 +1,7 @@
+// Decision state: AWAITING DECISION; illustrative baseline, not approved syntax.
+// Proposed v0.1 syntax; not yet compiler-validated.
+import { print } from "koda:io"
+
+export fn main() -> Unit {
+    print("Hello, Koda!")
+}

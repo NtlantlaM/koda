@@ -1,0 +1,7 @@
+// Decision state: AWAITING DECISION; illustrative baseline, not approved syntax.
+import { print } from "koda:io"
+import { greeting } from "./greeting.ko"
+
+export fn main() -> Unit {
+    print(greeting("Koda"))
+}

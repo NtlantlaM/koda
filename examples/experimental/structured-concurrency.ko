@@ -1,0 +1,24 @@
+// Decision state: AWAITING DECISION; illustrative baseline, not approved syntax.
+// EXPERIMENTAL discussion sketch, excluded from v0.1.
+// async, scope, spawn, and await are not frozen grammar.
+// loadName/loadRole are hypothetical async library functions returning Result.
+// LoadError and cancellation/error-aggregation policy remain undefined here.
+
+async fn summary() -> Result<String, LoadError> {
+    scope tasks {
+        let nameTask = tasks.spawn(loadName())
+        let roleTask = tasks.spawn(loadRole())
+
+        match await nameTask {
+            Ok(name) => {
+                match await roleTask {
+                    Ok(role) => Ok(name + ": " + role),
+                    Err(error) => Err(error),
+                }
+            },
+            Err(error) => Err(error),
+        }
+        // The scope must join all children before it completes.
+        // Whether an Err cancels siblings is a decision, not an assumption.
+    }
+}

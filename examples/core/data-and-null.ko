@@ -1,0 +1,21 @@
+// Decision state: AWAITING DECISION; illustrative baseline, not approved syntax.
+// Ordinary data construction performs no database operation.
+import { print } from "koda:io"
+
+type Profile {
+    name: String,
+    nickname: String?,
+}
+
+fn displayName(nickname: String?) -> String {
+    match nickname {
+        null => "Anonymous",
+        value => value,
+    }
+}
+
+export fn main() -> Unit {
+    let profile = Profile { name: "Ada", nickname: null }
+    print(profile.name)
+    print(displayName(profile.nickname))
+}

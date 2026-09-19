@@ -1,0 +1,20 @@
+// Decision state: AWAITING DECISION; illustrative baseline, not approved syntax.
+// EXPERIMENTAL discussion sketch, excluded from v0.1.
+// UserId and PersistenceError are future adapter-defined nominal types.
+// Generated identity, connection binding, and async behavior are unresolved.
+// This file deliberately has no executable main or configured database.
+
+type UserInput {
+    name: String,
+}
+
+entity User {
+    id: UserId,
+    name: String,
+}
+
+fn register(input: UserInput) -> Result<User, PersistenceError> {
+    // Explicit write; constructing UserInput above never writes.
+    // Proposed return type and brace-call syntax are not finalized.
+    User.create { name: input.name }
+}

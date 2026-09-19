@@ -1,0 +1,4 @@
+// Decision state: AWAITING DECISION; illustrative baseline, not approved syntax.
+export fn greeting(name: String) -> String {
+    "Hello, " + name
+}

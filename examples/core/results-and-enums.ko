@@ -1,0 +1,36 @@
+// Decision state: AWAITING DECISION; illustrative baseline, not approved syntax.
+import { print } from "koda:io"
+
+enum GreetingError {
+    MissingName,
+    ReservedName(String),
+}
+
+fn greet(name: String) -> Result<String, GreetingError> {
+    if name == "" {
+        Err(GreetingError.MissingName)
+    } else {
+        if name == "system" {
+            Err(GreetingError.ReservedName(name))
+        } else {
+            Ok("Hello, " + name)
+        }
+    }
+}
+
+fn show(result: Result<String, GreetingError>) -> Unit {
+    match result {
+        Ok(message) => print(message),
+        Err(error) => {
+            match error {
+                GreetingError.MissingName => print("Name is required"),
+                GreetingError.ReservedName(name) => print("Reserved name: " + name),
+            }
+        },
+    }
+}
+
+export fn main() -> Unit {
+    show(greet("Ada"))
+    show(greet(""))
+}
