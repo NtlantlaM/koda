@@ -52,3 +52,12 @@ Future tests assert codes, severity, spans, notes, deterministic ordering, UTF-8
 [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md) requires source-located checked integer overflow and division/remainder-by-zero faults. In semantically required constant evaluation, invalid arithmetic is a compile-time error. Ordinary unreachable code is a separate policy: there is no blanket Q02 requirement to reject every invalid arithmetic subtree in an unexecuted ordinary branch. Invalid literals retain static validation; predictable conversion errors remain Result values.
 
 Float overflow to infinity, NaN results, and gradual underflow to signed zero are valid numeric outcomes, including literal rounding. A nonzero literal rounding to zero may receive an optional warning. Q07 still owns codes, rendering, warning configuration, evaluator resource-limit reporting, and exit contracts; these details must not redefine accepted numeric values. See [future conformance obligations](../../tests/numeric-conformance.md).
+
+
+## Accepted beginner-first and AI-assistance principles
+
+[Q04 / ADR 0010](../decisions/0010-q04-result-obligations.md) requires ordinary diagnostics, especially recoverable-failure diagnostics, to answer in plain language: what happened, where, why Koda cares, and what the developer can do next. Primary rendering should not require specialist terminology.
+
+Diagnostics use progressive disclosure: concise actionable rendering first, deterministic offline explanation second, and optional AI assistance third. The compiler remains authoritative. AI may explain structured diagnostics and propose context-aware repairs, but it cannot suppress an error, redefine validity, or be required for baseline Koda tooling.
+
+Mechanically safe edits must be classified by deterministic tooling rather than AI judgment. Exact diagnostic schema, final code registry, CLI commands, AI configuration/provider/privacy contracts, and patch-application UX remain Q07 decisions.
