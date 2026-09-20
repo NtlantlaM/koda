@@ -1,6 +1,6 @@
 # Q03: Mutation and aliasing
 
-State: **AWAITING DECISION**. Selected option: **none**. All refinements remain pending.
+State: **ACCEPTED** via [ADR 0009](../../decisions/0009-q03-mutation-and-aliasing.md). Selected option: **A**, with the refinements below.
 Depends on Q11; informs Q04, Q06, Q08, Q10.
 
 Q11 is ACCEPTED via [ADR 0007](../../decisions/0007-q11-type-boundaries.md): no reference/object identity is exposed, and alias-aware mutable smart casts are excluded from v0.1. These are fixed constraints, not pending Q03 refinements; mutation and aliasing policy remain AWAITING DECISION.
@@ -39,11 +39,30 @@ Does mut permit rebinding, field updates with value semantics, or ownership-cont
 | Interoperability | Validate/copy foreign objects | Boundary copies preserve value semantics | Foreign ownership difficult to prove |
 | Compatibility | Later mutation can be explicitly distinct | Early copying/identity promise | Ownership permeates API design |
 
-## Recommendation, not acceptance
+## Accepted direction
 
-Recommend **A**. This is an observable guarantee, not a mandate to recursively freeze every emitted object. Internal sharing is fine if callers cannot observe mutation.
+Selected **A**. This is an observable guarantee, not a mandate to recursively freeze every emitted object. Internal sharing is allowed when callers cannot observe mutation.
 
-| Subchoice (AWAITING DECISION) | Alternatives and tradeoff | Recommended candidate |
+Accepted refinements:
+
+1. Bindings are immutable by default; explicit mutable bindings may be rebound.
+2. For ordinary core values, `mut` grants rebinding only; it does not make fields mutable.
+3. Ordinary records, enums, primitives, and core collections have transitively immutable value semantics.
+4. Implementations may physically share values, but aliases are semantically independent from later rebinding.
+5. Ordinary function parameters are immutable and cannot mutate caller-owned core values.
+6. Mutable-reference/`inout` parameters are deferred beyond v0.1.
+7. Core collections are immutable values; update-like operations produce new values.
+8. Persistent data structures are an implementation strategy, not a semantic requirement.
+9. v0.1 closures may capture immutable bindings only; capture/rebinding of mutable locals is deferred.
+10. Entity identity and persistence mutation remain Q09 decisions and are not Active Record semantics by implication.
+11. Foreign mutable objects must cross through explicit handles or snapshot/validated conversion; raw foreign mutability cannot masquerade as a core value.
+12. Ordinary assignment requires no user-visible clone operation to obtain semantic independence.
+13. Ordinary immutable values may be shared across concurrency boundaries; Q10 governs tasks/resources.
+14. Shared mutable state requires an explicit future resource/concurrency mechanism.
+15. Rust-style ownership, borrowing, lifetimes, and move semantics are not part of v0.1.
+16. Deep immutability is a semantic guarantee, not a requirement to recursively freeze backend objects.
+
+| Subchoice (historical subchoice) | Alternatives and tradeoff | Recommended candidate |
 | --- | --- | --- |
 | Updates | Reconstruction: simple/verbose; with-expression: concise/new grammar; mutable fields: different model | Reconstruction initially |
 | Nested fields | Deep immutable core values: strong; shallow: easier/alias risk; capabilities: expressive/complex | All reachable core data immutable; defer foreign mutable handles inside records |
@@ -55,7 +74,7 @@ Before approval, decide b = a followed by rebinding a, attempted a.field assignm
 
 ## Expanded v0.1 decision surface
 
-The following refinements remain **AWAITING DECISION**. They make the observable consequences of Option A explicit without accepting it.
+The following refinements record the accepted observable consequences of Option A. Syntax/API spelling still belongs to Q01, and explicitly deferred features remain outside v0.1.
 
 ### Bindings and `mut`
 
@@ -63,10 +82,10 @@ A binding is immutable by default. Under the recommended Option A, `mut` would p
 
 ```koda
 name = "Koda"
-// name = "Koda 2"          // proposed: reject
+// name = "Koda 2"          // reject
 
 mut count = 0
-count = count + 1            // proposed: allow
+count = count + 1            // allow
 ```
 
 For structured values, this distinction remains visible:
@@ -74,8 +93,8 @@ For structured values, this distinction remains visible:
 ```koda
 mut user = User { name: "Ntlantla" }
 
-// user.name = "Killo"       // proposed: reject field mutation
-user = User { name: "Killo" } // proposed: allow rebinding
+// user.name = "Killo"       // reject field mutation
+user = User { name: "Killo" } // allow rebinding
 ```
 
 Exact declaration and update spelling belongs to Q01.
@@ -104,7 +123,7 @@ user = User {
     address: Address { city: "Johannesburg" }
 }
 
-// user.address.city = "Pretoria" // proposed: reject
+// user.address.city = "Pretoria" // reject
 ```
 
 Ergonomic immutable-update syntax may be added by Q01, but its semantics must produce a new value.
@@ -167,9 +186,9 @@ The proposed guarantee is semantic deep immutability for ordinary core values, n
 
 Foreign boundaries require validation, copying, wrappers, or handles sufficient to preserve that guarantee.
 
-## Decisions required before Q03 acceptance
+## Accepted Q03 decisions
 
-The following semantic questions should be resolved before Q03 becomes ACCEPTED:
+The following semantic questions are resolved for Q03:
 
 1. Whether immutable-by-default bindings and explicit rebinding are the v0.1 model.
 2. Whether `mut` means rebinding only for ordinary core values.
@@ -179,7 +198,7 @@ The following semantic questions should be resolved before Q03 becomes ACCEPTED:
 6. Whether mutable-reference/`inout` parameters are deferred.
 7. Whether core collections are immutable values in v0.1.
 8. Whether persistent collections are a semantic requirement or merely an implementation option.
-9. Whether closure capture of mutable locals is allowed, restricted, or deferred.
+9. Closure capture of mutable locals is deferred; v0.1 closures may capture immutable bindings only.
 10. Whether entity mutation remains wholly under Q09.
 11. Whether foreign mutable objects require explicit handles or snapshot conversion.
 12. Whether user-visible cloning is unnecessary for ordinary values.
