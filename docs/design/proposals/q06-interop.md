@@ -5,6 +5,8 @@ Depends on Q02–Q05; supplies the external contract for Q08.
 
 The accepted [Q11 decision](../../decisions/0007-q11-type-boundaries.md) fixes Unicode scalar-value strings and rejection of invalid/lone surrogates at foreign boundaries. Those requirements are no longer optional refinements; this proposal still awaits a decision on adapter behavior and error reporting. Q06 remains AWAITING DECISION.
 
+[Q02 / ADR 0008](../../decisions/0008-q02-numeric-semantics.md) fixes [numeric validation and JSON profiles](../../spec/numbers.md): checked signed-64-bit BigInt input, conservative safe-integer Number-to-Int defaults, explicit exact/rounded exports, and schema-selected lossless JSON transport. Every option below must preserve these requirements in all builds. Foreign declaration syntax, codec APIs/tag layouts, wrapping errors, delivery scope, and the explicit overflow policy for a wider-than-Int BigInt-to-Float adapter remain Q06 work; no unchecked coercion option is available.
+
 ## Decision and why it matters
 
 Choose how foreign signatures are declared, validated, loaded, and installed. A declaration cannot prove what arbitrary JavaScript will return or throw. npm access must not silently weaken compiler authority or immutable/null-safe guarantees.
@@ -48,7 +50,7 @@ Recommend **A** for v0.1, with **C** as a documented later bridge if a motivatin
 | Subchoice (AWAITING DECISION) | Alternatives and tradeoff | Recommended candidate |
 | --- | --- | --- |
 | Declaration format | foreign block in .ko: one language/parser work; TOML schema: simple/less expressive; handwritten adapters: more trust | Explicit .ko foreign block, separate declared JS result from generated Koda Result signature; final spelling returns to Q01 |
-| Value checks | Trust declaration: cheap/unsound; validate every boundary: safe/cost; development-only: inconsistent | Always validate supported primitives, numeric ranges, Unicode policy, null mapping |
+| Remaining value checks | Explicit codecs: safe/configuration; generated validators: convenient/compiler work; narrower boundary: less coverage | Q02 numeric and Q11 Unicode validation are mandatory in every build mode; settle remaining primitive/null/codec behavior |
 | undefined | Always map to null: convenient/conflates; reject: strict; opt-in nullable conversion: explicit | Reject unless declared conversion to nullable; never collapse Unit and absence |
 | Throws | Fatal: simple; declared Result wrapping: recoverable; arbitrary catch syntax: extra language | Call throws and invalid return values become ForeignError variants, including non-Error throws |
 | Loading failure | Fatal startup: simple; explicit async load Result: flexible/new surface; lazy first-call load: surprising effects | Source-located fatal initialization diagnostic before main; call failures remain Results; import success cannot be assumed from type checking |

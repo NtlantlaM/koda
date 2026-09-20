@@ -2,7 +2,7 @@
 
 > Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
 
-Status: **ACCEPTED** user principles; Q11-specific nominality, signatures, inference, null/string/equality rules and deferrals are now accepted in [ADR 0007](0007-q11-type-boundaries.md). Numeric behavior, mutation/aliasing, Result enforcement, and unrelated scope remain **AWAITING DECISION** under their existing questions.
+Status: **ACCEPTED** user principles; Q11-specific nominality, signatures, inference, null/string/equality rules and deferrals are now accepted in [ADR 0007](0007-q11-type-boundaries.md). Numeric behavior is now accepted in [ADR 0008](0008-q02-numeric-semantics.md). Mutation/aliasing, Result enforcement, and unrelated scope remain **AWAITING DECISION** under their existing questions.
 Date: 2026-09-19
 
 ## Context
@@ -19,4 +19,4 @@ Structural records would ease some interop but blur domain distinctions. Implici
 
 ## Consequences
 
-Programs may be more verbose, especially when matching errors. Diagnostics can explain missing alternatives and unsafe nullable use precisely. Numeric rules, record aliasing, and unused Result enforcement require Q02–Q04 before compiler implementation. Traits are a future composition mechanism, not a prerequisite for v0.1 generic identity/data functions.
+Programs may be more verbose, especially when matching errors. Diagnostics can explain missing alternatives and unsafe nullable use precisely. Numeric rules are settled by Q02; record aliasing and unused Result enforcement still require Q03–Q04 before compiler implementation. Traits are a future composition mechanism, not a prerequisite for v0.1 generic identity/data functions.

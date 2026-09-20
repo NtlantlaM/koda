@@ -2,7 +2,7 @@
 
 > Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
 
-Status: **ACCEPTED** Q11 rules are recorded in [ADR 0007](../decisions/0007-q11-type-boundaries.md), alongside the user principles of strong typing, immutable defaults, null safety, explicit results, and enum matching. Numeric behavior, mutation/aliasing, and Result enforcement remain **AWAITING DECISION** under Q02–Q04. Concrete syntax remains Q01.
+Status: **ACCEPTED** Q11 rules are recorded in [ADR 0007](../decisions/0007-q11-type-boundaries.md), alongside the user principles of strong typing, immutable defaults, null safety, explicit results, and enum matching. Numeric behavior is **ACCEPTED** in [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md). Mutation/aliasing and Result enforcement remain **AWAITING DECISION** under Q03–Q04. Concrete syntax remains Q01.
 
 ## Types and inference
 
@@ -54,18 +54,18 @@ enum Result<T, E> {
 
 Match exhaustiveness covers enums, `Bool`, and nullable types. Matching open domains such as numbers and strings requires a catch-all binding or `_`. Arms are considered in order; unreachable arms are diagnosed. Each variant's payload must have the correct arity. All value-producing arms must agree on a type, allowing only explicit nullable injection. No implicit union inference is proposed.
 
-## Numeric and equality proposal
+## Accepted numeric semantics and equality
 
-Candidate v0.1 model: `Int` is a checked safe integer backed by JavaScript numbers; `Float` is binary64. This is EXPERIMENTAL: Q02 must define range, overflow, division, remainder, non-finite values, and literal typing. Do not infer semantics from the backend's operators.
+`Int` is checked signed 64-bit and `Float` is IEEE-754 binary64 on every backend. [Numeric semantics](numbers.md) defines accepted Q02 literal typing, explicit conversions, truncating division/remainder, checked faults, binary64 special values, and boundary validation. JavaScript implementation choices cannot redefine these rules. Decimal is reserved but unusable in v0.1.
 
-Primitive equality is supported in v0.1. The candidate same-type comparison rule and precise numeric edge cases remain subject to Q02 and the remaining static-rule specification. Reference/object identity is not exposed. Derived equality for user-defined value types is deferred; entity identity/equality is a later persistence decision under Q09. Ordering remains numeric only in the baseline proposal.
+Primitive equality is supported in v0.1. Q02 requires matching typed numeric operands for equality and ordering; mixed Int/Float comparisons require explicit conversion. NaN is unequal to itself and all its ordering comparisons are false; signed zeros compare equal. Reference/object identity is not exposed. Derived equality for user-defined value types is deferred; entity identity/equality is a later persistence decision under Q09. Ordering remains numeric only in the baseline proposal.
 
 ## Strings
 
 Strings have Unicode scalar-value semantics. Equality compares exact scalar-value sequences without normalization; canonical equivalence alone does not make differently represented sequences equal. Invalid/lone surrogate values are rejected at foreign boundaries; Q06 still determines the surrounding conversion/error contract.
 
-String interpolation and multiline strings are supported. Q01 must define their spelling, escaping, and multiline layout rules; interpolation conversion/formatting rules are not selected by this feature decision. Direct string indexing and length semantics are deferred. No UTF-16 code-unit indexing or implicit length definition is inherited from JavaScript.
+String interpolation and multiline strings are supported. Q01 must define their spelling, escaping, and multiline layout rules; numeric interpolation follows [Q02's canonical formatting rules](numbers.md); nonnumeric interpolation conversion rules remain to be specified. Direct string indexing and length semantics are deferred. No UTF-16 code-unit indexing or implicit length definition is inherited from JavaScript.
 
 ## Failure boundary
 
-Expected failures use `Result`. Unrecoverable runtime failures such as violated runtime invariants or exhausted resources are fatal and cannot become arbitrary successful values. Which numeric failures are fatal versus explicit results is part of Q02. JavaScript exceptions require the explicit interop policy in Q06.
+Expected failures use `Result`. Unrecoverable runtime failures such as violated runtime invariants or exhausted resources are fatal and cannot become arbitrary successful values. Q02 fixes source-located checked integer faults and Result-returning fallible numeric conversions; see [the separate constant-evaluation contract](numbers.md#arithmetic-faults-and-constant-evaluation-s17). Fault transport and exit reporting remain Q04/Q07 integration work. JavaScript exceptions require the explicit interop policy in Q06.

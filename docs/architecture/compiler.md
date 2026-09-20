@@ -48,7 +48,7 @@ Use a package dependency direction of tools -> compiler -> shared source/diagnos
 
 After syntax freeze, prefer a hand-written lexer, recursive-descent declarations/statements, and a Pratt expression parser for targeted diagnostics. Prototype ambiguous constructs before committing. Represent types and IR with discriminated TypeScript unions and explicit IDs. A full constraint solver, optimizer, incremental daemon, and plugin system are unnecessary for v0.1.
 
-Choose the JavaScript representation of `Unit`, nullable values, enum tags/payloads, checked arithmetic, and source maps in Q08 before backend work. Preserve left-to-right evaluation and execute side-effecting expressions exactly once when lowering `match` or runtime checks.
+Choose the JavaScript representation of `Unit`, nullable values, enum tags/payloads, and source maps in Q08 before backend work. [Q02 numeric semantics](../spec/numbers.md) is accepted; Q08 chooses conforming Int storage/check machinery and Float lowering, not arithmetic meaning. Future literal handling must retain exact magnitude until contextual/default typing, and required constant evaluation must remain separate from ordinary reachability diagnostics. Preserve left-to-right evaluation and execute side-effecting expressions exactly once when lowering `match` or runtime checks.
 
 Build outputs must be deterministic for the same source, compiler version, target, and lockfile. The CLI should stage output and avoid replacing a valid build with partial artifacts. No source text is executed during lexing, checking, or formatting. No network or AI service is required to determine correctness.
 

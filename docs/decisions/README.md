@@ -13,6 +13,7 @@ ADRs preserve rationale. Status uses the same four values as the [feature regist
 | [0005](0005-small-v01-and-library-boundaries.md) | EXPERIMENTAL / AWAITING DECISION | Small v0.1 and library/platform separation |
 | [0006](0006-structured-concurrency-direction.md) | ACCEPTED | Structured concurrency direction; defer implementation |
 | [0007](0007-q11-type-boundaries.md) | ACCEPTED | Q11: nominal types, inference boundaries, invariant generics, null refinement, strings, equality, names, recursion, and explicit deferrals |
+| [0008](0008-q02-numeric-semantics.md) | ACCEPTED | Q02: backend-independent Int64/binary64, literal context, conversions, checked faults, numeric boundaries and explicit deferrals |
 
 ## New ADR template
 

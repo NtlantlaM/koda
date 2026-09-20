@@ -3,6 +3,8 @@
 State: **AWAITING DECISION**. Selected option: **none**. Every refinement remains pending.
 Depends on Q02/Q03; informs syntax, interop, tools, and concurrency.
 
+[Q02 / ADR 0008](../../decisions/0008-q02-numeric-semantics.md) fixes fallible numeric conversions as Results with non-finite/out-of-range/inexact categories and fixes source-located checked arithmetic faults. Required constant evaluation rejects invalid arithmetic; ordinary unreachable branches have no blanket Q02 rejection rule. Public error names/payloads and fault integration remain open here and under Q07. These accepted constraints do not select this proposal's Result-use enforcement policy.
+
 ## Decision and why it matters
 
 Choose what callers must do with Result, whether intentional discard is allowed, and what overwrite/storage/transfer means. Also distinguish recoverable standard-library failures from fatal defects. Explicit Result is accepted; enforcement strength is not.
@@ -48,6 +50,6 @@ Recommend **B**, with an honest local proof boundary. It cannot prove business i
 | Intentional ignoring | Underscore assignment: terse; discard function: visible; explicit match: verbose/auditable | Explicit match; no dedicated discard escape in v0.1; ignoring in both arms is intentionally allowed |
 | Propagation | Match/return: small; explicit ?/try sugar: concise; implicit propagation: conflicts with brief | Match/return initially |
 | I/O failures | Result-returning writes: recoverable; Unit/fatal print: easy; both: larger API | Checked output returns Result; existing Unit-print examples await revision only after approval |
-| Fatal faults | General exceptions: new model; fatal diagnostic: small; Result for every defect: pervasive | Fatal invariant/arithmetic path, foreign throws converted at declared boundaries |
+| Remaining fault integration | Fatal diagnostics: small; recoverable nonnumeric defects: broader model; Result for expected failures: explicit | Respect accepted Q02 checked arithmetic faults and conversion Results; decide remaining invariant/foreign policy and integration without changing numeric semantics |
 
 Before approval, cover unused bindings, only-one-branch use, overwrites, return/storage/argument transfer, and deliberate ignoring. If path analysis is too large, explicitly choose A rather than advertising B while counting name references.

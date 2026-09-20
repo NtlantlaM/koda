@@ -44,3 +44,7 @@ The language may eventually recognize a backend-neutral entity declaration. Adap
 Credentials and connection strings belong to runtime configuration, never grammar or generated source. Authentication, authorization, tenancy, and framework models are application/library responsibilities; `entity` does not imply authorization.
 
 Before implementation, decide identity, schema metadata, explicit connection binding, query representation, write return types, null mapping, optimistic concurrency, transaction isolation, and migration ownership. See Q09 and ADR 0003. The example in `examples/experimental` is a discussion artifact, not a database integration test.
+
+## Accepted future numeric adapter constraints
+
+[Q02 S14 / ADR 0008](../decisions/0008-q02-numeric-semantics.md) accepts explicit metadata/codecs with range and representation checks; implementation is deferred until persistence. Follow the [numeric persistence contract](numbers.md#future-persistence-contract-s14): exact signed-64-bit transport, checked narrower writes, no trust in unsafe Number driver outputs, declared Float preservation capabilities, and no automatic database DECIMAL/NUMERIC-to-Float conversion. Decimal remains reserved and unusable in v0.1. SQL expression/aggregate/nullability and round-trip contracts remain future adapter work. Q09's schema/API and entity identity/equality decisions remain AWAITING DECISION.

@@ -6,7 +6,7 @@ No compiler implementation is included in this repository. Stages are ordered by
 
 ## Stage 0 — Freeze the executable language subset
 
-Q11 is resolved by [ADR 0007](decisions/0007-q11-type-boundaries.md). Resolve the remaining Q01–Q08, formalize the complete subset grammar and static rules consistent with Q11, and update the status register. Decide numeric semantics, mutation, Result enforcement, module/manifest behavior, foreign ABI, tool commands, runtime representations, and supported host versions. Interpolation and multiline strings are accepted features whose concrete syntax still needs Q01. Convert examples into an agreed fixture inventory with expected behavior and negative cases.
+Q11 and Q02 are resolved by [ADR 0007](decisions/0007-q11-type-boundaries.md) and [ADR 0008](decisions/0008-q02-numeric-semantics.md). Resolve Q01 and Q03–Q08, formalize the complete subset grammar and static rules consistent with both accepted decisions, and update the status register. Decide mutation, Result enforcement, module/manifest behavior, foreign ABI, tool commands, runtime representations, and supported host versions. Complete numeric lexical/API spelling and the separate required-constant-evaluation and unreachable-code diagnostic contracts without reopening accepted arithmetic semantics. Interpolation and multiline strings are accepted features whose concrete syntax still needs Q01. Convert examples into an agreed fixture inventory with expected behavior and negative cases.
 
 Exit: all nine v0.1 blocking questions have recorded decisions; every v0.1 construct has syntax, typing, runtime behavior, and diagnostic expectations; experimental persistence/concurrency are explicitly excluded. Selecting a license is required before public release. **The current task stops at this design baseline; it does not execute later stages.**
 
@@ -30,7 +30,7 @@ Exit: positive and negative conformance cases cover every supported type rule; d
 
 ## Stage 4 — JavaScript/Node execution
 
-Introduce typed IR, lowering, minimal runtime/stdlib, ESM emission, and source maps. Expose `build` and `run` with the frozen entry contract. Implement numeric behavior rather than inheriting JavaScript defaults.
+Introduce typed IR, lowering, minimal runtime/stdlib, ESM emission, and source maps. Expose `build` and `run` with the frozen entry contract. Implement [accepted numeric behavior](spec/numbers.md) rather than inheriting JavaScript defaults, and satisfy the [future numeric conformance obligations](../tests/numeric-conformance.md) across build modes. Persistence adapter implementation remains deferred until persistence.
 
 Exit: core examples execute with expected output; evaluation order and runtime boundary cases pass; errors map to `.ko`; repeated builds are deterministic; failed builds do not publish partial artifacts.
 

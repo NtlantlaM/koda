@@ -1,6 +1,6 @@
 # Feature status register
 
-Nothing is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
+Nothing is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md) and [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
 
 - **ACCEPTED**: user-supplied principle or expressly approved design decision. Details outside that approval require separate decisions.
 - **EXPERIMENTAL**: a candidate design requiring evaluation; syntax and semantics may change or be removed.
@@ -23,8 +23,15 @@ Nothing is implemented. ACCEPTED covers user-supplied principles and expressly a
 | Functions, lexical scopes, modules, explicit exports | EXPERIMENTAL | v0.1 | AWAITING DECISION |
 | Small invariant user-defined generics | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Variance and advanced generic constraints | LATER | Deferred by Q11 | ACCEPTED deferral |
-| Numeric primitive model | EXPERIMENTAL | Q02 must resolve range and arithmetic behavior | AWAITING DECISION |
-| Primitive equality; no exposed reference/object identity | ACCEPTED | v0.1; Q11; numeric edge cases remain Q02 | ACCEPTED scope |
+| Checked signed-64-bit Int; binary64 Float; same semantics on every backend/build mode | ACCEPTED | v0.1; [Q02 semantics](../spec/numbers.md) | ACCEPTED |
+| Exact contextual literal typing; explicit typed numeric conversions and same-type comparisons | ACCEPTED | v0.1; Q02; spelling remains Q01 | ACCEPTED |
+| IEEE Float special values/rounding; source-located checked Int faults | ACCEPTED | v0.1; Q02; required constant evaluation distinct from unreachable code | ACCEPTED |
+| Numeric text, foreign validation, and explicit JSON numeric profiles | ACCEPTED | Q02 semantics; API/integration scope remains Q01/Q06 | ACCEPTED semantics |
+| Numeric persistence mapping requirements | ACCEPTED | Q02 S14; implementation deferred until persistence; Q09 unresolved | ACCEPTED semantics |
+| Decimal reservation; no usable v0.1 Decimal | ACCEPTED | Q02; reservation mechanism Q01 | ACCEPTED |
+| Decimal semantics; exponentiation; Float remainder; bitwise/unsigned operations; transcendental functions; hex Float/suffix forms | LATER | Explicit Q02 deferrals | ACCEPTED deferral |
+| Float bit/NaN payload APIs, total ordering, numeric hashing, extra rounding modes and trap/flag controls | LATER | Explicit Q02 deferrals | ACCEPTED deferral |
+| Primitive equality; no exposed reference/object identity | ACCEPTED | v0.1; Q11 and accepted Q02 numeric comparison rules | ACCEPTED scope |
 | Derived equality for user-defined value types | LATER | Deferred by Q11 | ACCEPTED deferral |
 | Entity identity/equality | LATER | Deferred by Q11; persistence semantics remain Q09 | ACCEPTED deferral; Q09 AWAITING DECISION |
 | Unicode scalar-value strings; exact non-normalizing equality | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |

@@ -3,6 +3,8 @@
 State: **AWAITING DECISION**. Selected option: **none**. All commands, codes, and formats are candidates.
 Depends on Q01, Q04–Q06, Q08.
 
+[Q02 / ADR 0008](../../decisions/0008-q02-numeric-semantics.md) requires source-located checked arithmetic faults and compile-time rejection in required constant evaluation. Float literal underflow-to-zero permits an optional warning; it is not a numeric error. Diagnostic identifiers, presentation, warning policy, evaluator resource reporting, fault transport and process exit codes remain Q07 work. Ordinary unreachable-code diagnostics must be distinguished from required constant evaluation.
+
 ## Decision and why it matters
 
 Choose entry/test conventions, CLI command outcomes, machine/human streams, span encoding, and canonical formatting. One toolchain is accepted; its protocol is not. Automation and AI tools need parseable output that means the same thing as terminal diagnostics.

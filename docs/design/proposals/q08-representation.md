@@ -3,6 +3,8 @@
 State: **AWAITING DECISION**. Selected option: **none**. All representation details remain pending.
 Depends on Q11/Q02–Q04 and the Q06 public boundary.
 
+[Q02 / ADR 0008](../../decisions/0008-q02-numeric-semantics.md) fixes checked signed-64-bit Int, per-operation binary64 Float, numeric conversions, and observable faults independently of storage. Q08 selects private representations/helpers and ABI details only. Raw Number arithmetic is not a valid Int model; optimizations must preserve exact results, checks, signed zero, subnormals, and evaluation behavior. No portable NaN-payload/bit/hash/total-order API is implied.
+
 ## Decision and why it matters
 
 Choose the observable runtime contract and private representation for records, enums, nullables, Unit, generics, numeric checks, modules, and source maps. Separate stable Koda semantics from internal JS object layouts so optimizations do not become breaking language changes.
@@ -47,7 +49,7 @@ Recommend **A**, keeping representations private and the public foreign contract
 | Unit | undefined: compact/conversion hazards; singleton: distinct; no value: complicates generics | Private singleton Unit value; null represents absent nullable, so Unit? has two distinguishable states |
 | Records | Plain private objects: simple; freeze: defense/cost; persistent structure library: updates/weight | Plain private immutable-by-contract values; Q03 boundary enforcement applies |
 | Generic execution | Erasure: small; specialization: potentially fast/code growth; dictionaries: supports constraints | Erasure for the unconstrained Q11 subset |
-| Arithmetic | Raw JS: cheap/incorrect if semantics differ; helper checks: clear; inline proven checks: fast/larger | Shared helpers first, exact Q02 behavior; optimization requires conformance evidence |
+| Arithmetic representation | Checked BigInt/helpers: clear; proven specialized representations: potentially faster/more proof work; inline checks: larger output | Shared helpers first, exact Q02 behavior; optimization requires conformance evidence |
 | Output units | One module/source: traceable; single bundle: portable; preserve source extensions: custom loader | One .mjs per .ko with rewritten deterministic imports; .mjs unambiguously identifies Node ESM |
 | Runtime dependency | Installed shared package: smaller; vendored build-local runtime: reproducible; inline everywhere: duplication | Version-matched build-local runtime artifact referenced by emitted modules |
 | Maps and publishing artifacts | Maps only: private source; embedded sources: easy debugging/exposure; no maps: small/poor errors | Source maps without embedded source by default, retain project-relative source paths; explicit source embedding option later |

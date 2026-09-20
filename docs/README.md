@@ -9,6 +9,7 @@ The specifications define Koda independently of any compiler implementation. Thi
 | [Language](spec/language.md) | Principles, scope, evaluation model |
 | [Syntax](spec/syntax.md) | Lexical rules, proposed grammar, precedence |
 | [Type system](spec/type-system.md) | Inference, mutability, null safety, enums, results |
+| [Numbers](spec/numbers.md) | Accepted numeric semantics, conversions, and boundaries |
 | [Diagnostics](spec/diagnostics.md) | Stable diagnostic identity, human and machine output |
 | [Entities and persistence](spec/entities-and-persistence.md) | Persistent data boundaries and explicit effects |
 | [Project structure](spec/project-structure.md) | Modules, manifest, CLI and package policy |
@@ -17,7 +18,7 @@ The specifications define Koda independently of any compiler implementation. Thi
 | [Toolchain layout](../packages/README.md) | Future package responsibilities |
 | [Conformance strategy](../tests/README.md) | Future acceptance tests |
 | [Feature statuses](design/feature-status.md) | Canonical feature classification and delivery scope |
-| [Open questions](design/open-questions.md) | Q11 ACCEPTED; twelve other proposals remain AWAITING DECISION |
+| [Open questions](design/open-questions.md) | Q11 and Q02 ACCEPTED; eleven other proposals remain AWAITING DECISION |
 | [Specification review](design/specification-review.md) | Complete baseline review, missing choices, relocation verification |
 | [ADRs](decisions/README.md) | Rationale and consequences |
 | [Roadmap](roadmap.md) | Stages, dependencies, and exit criteria |

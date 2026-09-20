@@ -1,6 +1,6 @@
 # Review of the initial specification
 
-Review date: 2026-09-19. The findings below record the initial review. Update on 2026-09-20: [Q11 is ACCEPTED](../decisions/0007-q11-type-boundaries.md); all other unresolved questions remain **AWAITING DECISION**.
+Review date: 2026-09-19. The findings below record the initial review. Update on 2026-09-20: [Q11 is ACCEPTED](../decisions/0007-q11-type-boundaries.md) and [Q02 is ACCEPTED](../decisions/0008-q02-numeric-semantics.md); all other unresolved questions remain **AWAITING DECISION**.
 
 ## Repository verification
 
@@ -15,7 +15,7 @@ Reviewed README, CONTRIBUTING, all seven specs, compiler architecture, feature r
 | Finding | Consequence | Proposal |
 | --- | --- | --- |
 | Newline/tail-expression rules, record/control-flow braces, and generic/comparison parsing are incomplete. | A parser must not invent rules. | Q01 |
-| Safe-range Int lacks division, conversion, overflow, and intermediate-precision rules. | JS lowering could silently corrupt values. | Q02 |
+| The initial safe-range Int lacked division, conversion, overflow, and intermediate-precision rules. | Resolved by checked signed-64-bit Int and backend-independent Float semantics; private representation still pending. | Q02 ACCEPTED / ADR 0008 |
 | Immutable binding and immutable object guarantees are conflated. | Shared aliases could violate user expectations. | Q03 |
 | Result discard, overwrite, and transfer rules are incomplete; print returns Unit despite I/O failure. | Define what checking proves and how I/O errors surface. | Q04 |
 | One Koda lockfile is proposed alongside npm delegation. | Decide how npm's own resolution data fits one authority. | Q05, Q06 |
@@ -30,6 +30,6 @@ Reviewed README, CONTRIBUTING, all seven specs, compiler architecture, feature r
 
 The user's explicit principles remain constraints: standalone .ko language, optional AI, compiler authority, readability/diagnostics, strong typing/inference, immutable defaults with mut, T?, Result, enums/matching, type/entity distinction, explicit writes, composition/traits, structured concurrency, one toolchain, TypeScript bootstrap, JavaScript/Node target, and no framework grammar.
 
-Old specs and ADRs remain a traceable baseline. Concrete details not explicitly approved remain **AWAITING DECISION**. Q11's rules and explicit deferrals were approved on 2026-09-20 and conflicting specifications have been reconciled; other release-scope recommendations remain proposals. Examples retain their original illustrative spelling. The freeze gate includes the now-resolved Q11 and the still-unresolved Q01–Q08.
+Old specs and ADRs remain a traceable baseline. Concrete details not explicitly approved remain **AWAITING DECISION**. Q11's and Q02's rules and explicit deferrals were approved on 2026-09-20 and conflicting specifications have been reconciled; other release-scope recommendations remain proposals. Examples retain their original illustrative spelling. The freeze gate includes the now-resolved Q11/Q02 and the still-unresolved Q01 and Q03–Q08.
 
 See the [ordered decisions](open-questions.md). No executable code was added.

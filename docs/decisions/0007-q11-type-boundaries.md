@@ -66,4 +66,4 @@ Interpolation support does not approve implicit conversions elsewhere or choose 
 
 ## Scope boundary
 
-Only Q11 is resolved. Q01–Q10 and Q12–Q13 remain **AWAITING DECISION**. Numeric behavior, mutation/aliasing, Result obligations, modules, foreign API/error contracts, runtime representation, tool protocols, concurrency, persistence, licensing, and publication policy are not selected here. Additional refinement forms and namespace rules are not inferred from this decision. No lexer, parser, compiler, runtime, CLI, or package-manager implementation is authorized.
+At this ADR's acceptance, only Q11 was resolved and Q01–Q10 and Q12–Q13 remained **AWAITING DECISION**. Subsequent [ADR 0008](0008-q02-numeric-semantics.md) resolves Q02; the scope of this Q11 decision is unchanged. Numeric behavior, mutation/aliasing, Result obligations, modules, foreign API/error contracts, runtime representation, tool protocols, concurrency, persistence, licensing, and publication policy are not selected here. Additional refinement forms and namespace rules are not inferred from this decision. No lexer, parser, compiler, runtime, CLI, or package-manager implementation is authorized.

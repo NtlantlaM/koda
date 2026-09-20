@@ -19,4 +19,4 @@ Translating informal prompts or lightly rewritten TypeScript would reduce initia
 
 ## Consequences
 
-The implementation can use the Node ecosystem while checking Koda rules itself. JavaScript differences need deliberate lowering and runtime checks. Runtime representation, supported Node versions, and foreign ABI remain Q02/Q05/Q06/Q08. TypeScript compiler errors describe implementation defects, not Koda source diagnostics.
+The implementation can use the Node ecosystem while checking Koda rules itself. JavaScript differences need deliberate lowering and runtime checks. Numeric semantics are now fixed by [ADR 0008](0008-q02-numeric-semantics.md). Runtime representation, supported Node versions, and foreign ABI remain Q05/Q06/Q08. TypeScript compiler errors describe implementation defects, not Koda source diagnostics.

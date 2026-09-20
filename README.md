@@ -13,7 +13,7 @@ Koda source files use `.ko`. The initial compiler will be written in TypeScript 
 - [Documentation index](docs/README.md)
 - [Language principles and scope](docs/spec/language.md)
 - [Feature status register](docs/design/feature-status.md)
-- [Ordered decisions — Q11 ACCEPTED; other questions AWAITING DECISION](docs/design/open-questions.md)
+- [Ordered decisions — Q11 and Q02 ACCEPTED; other questions AWAITING DECISION](docs/design/open-questions.md)
 - [Complete specification review and repository verification](docs/design/specification-review.md)
 - [Staged v0.1 roadmap](docs/roadmap.md)
 - [Example programs](examples/README.md)

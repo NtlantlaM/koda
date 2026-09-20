@@ -5,6 +5,8 @@ Resolve after Q11/Q02–Q04, then reconcile imports/foreign/test declarations be
 
 Q11 is now ACCEPTED via [ADR 0007](../../decisions/0007-q11-type-boundaries.md). Its shadowing restrictions, interpolation, and multiline-string support constrain this proposal. Their remaining grammar details are still Q01; Q01 itself is not resolved.
 
+[Q02 / ADR 0008](../../decisions/0008-q02-numeric-semantics.md) now fixes numeric semantics. Q01 must supply exact base/separator/exponent/sign grammar, direct minimum-literal/parenthesis handling, Decimal reservation, special-value/text tokens, and numeric API spelling without changing those rules. Decimal is not usable in v0.1; exponentiation and other explicitly deferred numeric features are not added by this syntax proposal.
+
 ## Decision and why it matters
 
 Choose statement termination, block values, record construction, generic calls, lexical policy, patterns, and reserved words. A grammar must let readers and the compiler interpret code without guessing from an AI's intent or future symbol tables.

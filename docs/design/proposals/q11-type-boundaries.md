@@ -41,7 +41,7 @@ Shadowing restrictions keep names unambiguous. Function recursion is available i
 - Direct string indexing and length semantics are deferred.
 - Recursive user-defined data types are deferred.
 
-Q01 still determines interpolation markers, multiline delimiters, escaping, indentation/newline handling, and relevant expression syntax; interpolation conversion rules must also be specified without implicitly accepting coercions. Q02 numeric semantics, Q03 mutation/aliasing, Q04 Result handling, Q06 foreign error reporting, and Q08 runtime representations remain unresolved. Q11 does not select additional null-refinement forms, type/value namespace rules, or broader release scope from the former recommendations.
+Q01 still determines interpolation markers, multiline delimiters, escaping, indentation/newline handling, and relevant expression syntax; numeric interpolation now follows [Q02 / ADR 0008](../../decisions/0008-q02-numeric-semantics.md), with other conversion rules still to be specified without implicit coercions. Q02 numeric semantics is accepted. Q03 mutation/aliasing, Q04 Result handling, Q06 foreign error reporting, and Q08 runtime representations remain unresolved. Q11 does not select additional null-refinement forms, type/value namespace rules, or broader release scope from the former recommendations.
 
 ## Historical alternatives considered
 

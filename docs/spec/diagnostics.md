@@ -46,3 +46,9 @@ Recovery should collect independent errors without flooding the user with cascad
 ## Verification requirements
 
 Future tests assert codes, severity, spans, notes, deterministic ordering, UTF-8 position handling, and valid schema output. Human rendering uses focused snapshots. Test that malformed input does not crash and suggested edits affect only their declared spans. Fatal compiler errors must result in a failed command, even if some earlier phases succeeded.
+
+## Accepted numeric diagnostic obligations
+
+[Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md) requires source-located checked integer overflow and division/remainder-by-zero faults. In semantically required constant evaluation, invalid arithmetic is a compile-time error. Ordinary unreachable code is a separate policy: there is no blanket Q02 requirement to reject every invalid arithmetic subtree in an unexecuted ordinary branch. Invalid literals retain static validation; predictable conversion errors remain Result values.
+
+Float overflow to infinity, NaN results, and gradual underflow to signed zero are valid numeric outcomes, including literal rounding. A nonzero literal rounding to zero may receive an optional warning. Q07 still owns codes, rendering, warning configuration, evaluator resource-limit reporting, and exit contracts; these details must not redefine accepted numeric values. See [future conformance obligations](../../tests/numeric-conformance.md).

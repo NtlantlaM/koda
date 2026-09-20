@@ -3,6 +3,8 @@
 State: **AWAITING DECISION**. Selected option: **none**. Every schema/API choice remains pending.
 Depends on core semantics and Q10 cancellation/cleanup. Proposed executable support remains post-v0.1.
 
+[Q02 / ADR 0008](../../decisions/0008-q02-numeric-semantics.md) accepts S14 B **semantically**, with implementation deferred until persistence. The [numeric persistence contract](../../spec/numbers.md#future-persistence-contract-s14) requires explicit metadata/codecs, exact Int64 transport and checked narrower writes, declared Float capabilities, and no silent database DECIMAL-to-Float conversion. SQL expression/aggregate/nullability and adapter round-trip contracts still need design. This does not select a Q09 alternative, entity identity/equality, database engine, or persistence API.
+
 ## Decision and why it matters
 
 Choose entity identity/schema ownership, explicit connection binding, writes, queries, errors, transactions, concurrency control, and migrations. type remains ordinary data and entity persistent data. A short create expression cannot secretly choose a connection or save on field assignment.
