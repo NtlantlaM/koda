@@ -1,6 +1,6 @@
 # Feature status register
 
-Nothing is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md) and [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
+Nothing is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md), [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md), and [Q03 / ADR 0009](../decisions/0009-q03-mutation-and-aliasing.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
 
 - **ACCEPTED**: user-supplied principle or expressly approved design decision. Details outside that approval require separate decisions.
 - **EXPERIMENTAL**: a candidate design requiring evaluation; syntax and semantics may change or be removed.
@@ -13,7 +13,7 @@ Nothing is implemented. ACCEPTED covers user-supplied principles and expressly a
 | Optional AI; compiler owns correctness | ACCEPTED | All stages; no AI dependency | AWAITING DECISION |
 | TypeScript compiler, JavaScript/Node.js backend | ACCEPTED | v0.1; ADR 0001 | AWAITING DECISION |
 | Explicit function parameter/return types; inferred locals and call results | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
-| Immutable bindings by default, explicit `mut` | ACCEPTED | v0.1; aliasing details in Q03 | AWAITING DECISION |
+| Immutable bindings by default; `mut` permits rebinding ordinary values | ACCEPTED | v0.1; Q03 / ADR 0009 | ACCEPTED |
 | Nullable `T?`; reject written `T??`; flatten nullable generic substitution | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Null refinement via match and explicit checks on stable immutable locals | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Alias-aware mutable smart casts | LATER | Not provided in v0.1; Q11 | ACCEPTED deferral |
