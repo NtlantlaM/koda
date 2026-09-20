@@ -3,6 +3,8 @@
 State: **AWAITING DECISION**. Selected option: **none**. All refinements remain pending.
 Depends on Q11; informs Q04, Q06, Q08, Q10.
 
+Q11 is ACCEPTED via [ADR 0007](../../decisions/0007-q11-type-boundaries.md): no reference/object identity is exposed, and alias-aware mutable smart casts are excluded from v0.1. These are fixed constraints, not pending Q03 refinements; mutation and aliasing policy remain AWAITING DECISION.
+
 ## Decision and why it matters
 
 Does mut permit rebinding, field updates with value semantics, or ownership-controlled mutation? Specify nested values and aliases. Immutable bindings alone do not guarantee immutable objects; this affects trust in generated code and future concurrency.
@@ -47,6 +49,5 @@ Recommend **A**. This is an observable guarantee, not a mandate to recursively f
 | Nested fields | Deep immutable core values: strong; shallow: easier/alias risk; capabilities: expressive/complex | All reachable core data immutable; defer foreign mutable handles inside records |
 | Enforcement | Compiler-only: fast; runtime freeze: defense/cost; boundary copy/validation: interop cost | Compiler internally, checked/copied boundary representations when object interop arrives |
 | Parameters | Immutable: clear; mutable parameter spelling: convenient; inferred mutation: less visible | Immutable parameters, explicit mutable local for rebinding |
-| Identity | No identity operation: portable; public reference identity: easy object-key lookup | No observable core-record identity |
 
 Before approval, decide b = a followed by rebinding a, attempted a.field assignment, nested updates, and a foreign function retaining a reference. Distinguish semantic copying from physical copying.

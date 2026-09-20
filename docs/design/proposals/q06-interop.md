@@ -3,6 +3,8 @@
 State: **AWAITING DECISION**. Selected option: **none**. All boundary and installation subchoices remain pending.
 Depends on Q02–Q05; supplies the external contract for Q08.
 
+The accepted [Q11 decision](../../decisions/0007-q11-type-boundaries.md) fixes Unicode scalar-value strings and rejection of invalid/lone surrogates at foreign boundaries. Those requirements are no longer optional refinements; this proposal still awaits a decision on adapter behavior and error reporting. Q06 remains AWAITING DECISION.
+
 ## Decision and why it matters
 
 Choose how foreign signatures are declared, validated, loaded, and installed. A declaration cannot prove what arbitrary JavaScript will return or throw. npm access must not silently weaken compiler authority or immutable/null-safe guarantees.

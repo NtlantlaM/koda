@@ -1,8 +1,8 @@
 # Decisions before specification freeze
 
-Decision state for every item: **AWAITING DECISION**. Selected options: **none**.
+Q11 is **ACCEPTED** by explicit user decision on 2026-09-20; see [ADR 0007](../decisions/0007-q11-type-boundaries.md). Q01–Q10 and Q12–Q13 remain **AWAITING DECISION**, with no selected options.
 
-Recommendations are advice, not accepted rules. The user's principles remain constraints; assistant-authored details do not become approved by appearing in a specification or ADR. Feature maturity (ACCEPTED / EXPERIMENTAL / LATER / REJECTED) and decision state are separate.
+Unresolved recommendations are advice, not accepted rules. The user's principles and explicit Q11 decision are constraints; assistant-authored details do not become approved merely by appearing in a specification or ADR. Feature maturity (ACCEPTED / EXPERIMENTAL / LATER / REJECTED) and decision state are separate.
 
 Read the [specification review](specification-review.md). Each proposal below includes the exact question, alternatives, benefits/costs, comparisons with Rust, Kotlin, Swift, TypeScript, Go, and Python, six impact dimensions, and an unaccepted recommendation. Comparisons cite primary documentation, researched 2026-09-19. Ecosystem/library behavior is distinguished from core grammar. Performance and AI effects are qualitative design assessments, not measurements.
 
@@ -10,7 +10,7 @@ Read the [specification review](specification-review.md). Each proposal below in
 
 | Order | Proposal | Dependencies | Gate | State |
 | --- | --- | --- | --- | --- |
-| 1 | [Q11: Type boundaries, inference, nulls, strings](proposals/q11-type-boundaries.md) | User principles | v0.1 freeze | AWAITING DECISION |
+| 1 (resolved) | [Q11: Type boundaries, inference, nulls, strings](proposals/q11-type-boundaries.md) | User principles | v0.1 freeze | ACCEPTED — ADR 0007 |
 | 2 | [Q02: Numbers](proposals/q02-numbers.md) | Q11 | v0.1 freeze | AWAITING DECISION |
 | 3 | [Q03: Mutation and aliasing](proposals/q03-mutability.md) | Q11 | v0.1 freeze | AWAITING DECISION |
 | 4 | [Q04: Result obligations](proposals/q04-results.md) | Q02, Q03 | v0.1 freeze | AWAITING DECISION |
@@ -32,6 +32,6 @@ The order permits feedback: confirm the Q05 lockfile policy against Q06 npm tran
 
 Record the selected option and each amended subchoice, rationale, approver, and date in a follow-up ADR. Update specs, feature statuses, examples, and future conformance expectations together. Silence, a recommendation, or a documentation commit is not approval.
 
-**Every subchoice in every proposal remains AWAITING DECISION**, including suggested spellings, numeric constants, exit codes, deferrals, and release policies. Selecting a main option later must not silently select all its refinements.
+**Unresolved choices remain AWAITING DECISION**, including syntax spellings, numeric constants, exit codes, and release policies. Q11's expressly approved rules and deferrals are accepted as recorded in ADR 0007; no unrelated recommendation or broader release scope is selected. Selecting a main option must not silently select unapproved refinements.
 
 No lexer, parser, compiler, runtime, CLI, or package-manager implementation is authorized by this review.

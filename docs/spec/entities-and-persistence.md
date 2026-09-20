@@ -6,6 +6,8 @@ Status: **ACCEPTED** distinction and explicit-write principle; **EXPERIMENTAL** 
 
 ## Data versus persistence
 
+[Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md) accepts nominal type identity and prohibits exposing reference/object identity. Entity identity/equality is explicitly deferred to this later persistence decision; nominal type identity does not itself define database-row identity or equality. Q09 remains AWAITING DECISION.
+
 `type` represents ordinary application data with no automatic database identity, lifecycle, or I/O. Constructing it creates a value. `entity` represents a persistent database-backed model. Reading, constructing, copying, or changing a local value must never implicitly save it. Field assignment cannot be a database write.
 
 ```ko

@@ -17,7 +17,7 @@ The specifications define Koda independently of any compiler implementation. Thi
 | [Toolchain layout](../packages/README.md) | Future package responsibilities |
 | [Conformance strategy](../tests/README.md) | Future acceptance tests |
 | [Feature statuses](design/feature-status.md) | Canonical feature classification and delivery scope |
-| [Open questions](design/open-questions.md) | Thirteen ordered proposals, all AWAITING DECISION |
+| [Open questions](design/open-questions.md) | Q11 ACCEPTED; twelve other proposals remain AWAITING DECISION |
 | [Specification review](design/specification-review.md) | Complete baseline review, missing choices, relocation verification |
 | [ADRs](decisions/README.md) | Rationale and consequences |
 | [Roadmap](roadmap.md) | Stages, dependencies, and exit criteria |

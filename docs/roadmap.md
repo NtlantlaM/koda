@@ -6,7 +6,7 @@ No compiler implementation is included in this repository. Stages are ordered by
 
 ## Stage 0 — Freeze the executable language subset
 
-Resolve Q01–Q08 and Q11, formalize the complete subset grammar and static rules, and update the status register. Decide numeric semantics, mutation, Result enforcement, module/manifest behavior, foreign ABI, tool commands, runtime representations, and supported host versions. Convert examples into an agreed fixture inventory with expected behavior and negative cases.
+Q11 is resolved by [ADR 0007](decisions/0007-q11-type-boundaries.md). Resolve the remaining Q01–Q08, formalize the complete subset grammar and static rules consistent with Q11, and update the status register. Decide numeric semantics, mutation, Result enforcement, module/manifest behavior, foreign ABI, tool commands, runtime representations, and supported host versions. Interpolation and multiline strings are accepted features whose concrete syntax still needs Q01. Convert examples into an agreed fixture inventory with expected behavior and negative cases.
 
 Exit: all nine v0.1 blocking questions have recorded decisions; every v0.1 construct has syntax, typing, runtime behavior, and diagnostic expectations; experimental persistence/concurrency are explicitly excluded. Selecting a license is required before public release. **The current task stops at this design baseline; it does not execute later stages.**
 

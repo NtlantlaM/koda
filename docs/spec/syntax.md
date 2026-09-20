@@ -8,7 +8,7 @@ Status: **EXPERIMENTAL** concrete syntax, pending Q01. The examples consistently
 
 Proposed v0.1 rules: UTF-8 input; ASCII identifiers `[A-Za-z_][A-Za-z0-9_]*`; case-sensitive names; `//` line comments. Unicode is allowed in strings and comments. Unicode identifiers and block comments are LATER.
 
-Strings use double quotes with `\n`, `\r`, `\t`, `\"`, and `\\` escapes. Interpolation is LATER. Decimal integer literals and decimal fractional literals are proposed; signs are unary operators. Numeric ranges and non-finite values are Q02.
+The existing single-line proposal uses double quotes with `\n`, `\r`, `\t`, `\"`, and `\\` escapes. String interpolation and multiline strings are accepted by [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md). Q01 remains AWAITING DECISION for their delimiters, interpolation markers, escaping, and multiline indentation/newline rules; conversion/formatting rules also remain to be specified. The sketch below is incomplete for these accepted features and must not be treated as a frozen grammar. Decimal integer and fractional literals remain proposed; signs are unary operators. Numeric ranges and non-finite values are Q02.
 
 Newlines terminate statements, except inside parentheses, brackets, and record/call argument lists. A binary operator at the end of a line continues its expression. Braces delimit blocks. Commas separate fields, parameters, arguments, variants, and match arms; trailing commas are allowed. Semicolons are not part of the proposal. Final block expressions supply a value; `return expression` exits a function early. Precise newline handling in nested braces must be formalized in Q01.
 

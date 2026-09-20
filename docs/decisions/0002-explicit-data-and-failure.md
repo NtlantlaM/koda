@@ -2,7 +2,7 @@
 
 > Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
 
-Status: **ACCEPTED** user principles; nominality, signatures, exact enforcement, and scope are **AWAITING DECISION** under Q11 and Q02–Q04.
+Status: **ACCEPTED** user principles; Q11-specific nominality, signatures, inference, null/string/equality rules and deferrals are now accepted in [ADR 0007](0007-q11-type-boundaries.md). Numeric behavior, mutation/aliasing, Result enforcement, and unrelated scope remain **AWAITING DECISION** under their existing questions.
 Date: 2026-09-19
 
 ## Context

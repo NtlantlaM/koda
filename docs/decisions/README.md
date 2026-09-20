@@ -12,6 +12,7 @@ ADRs preserve rationale. Status uses the same four values as the [feature regist
 | [0004](0004-diagnostics-and-toolchain.md) | ACCEPTED | Shared diagnostics and a single toolchain |
 | [0005](0005-small-v01-and-library-boundaries.md) | EXPERIMENTAL / AWAITING DECISION | Small v0.1 and library/platform separation |
 | [0006](0006-structured-concurrency-direction.md) | ACCEPTED | Structured concurrency direction; defer implementation |
+| [0007](0007-q11-type-boundaries.md) | ACCEPTED | Q11: nominal types, inference boundaries, invariant generics, null refinement, strings, equality, names, recursion, and explicit deferrals |
 
 ## New ADR template
 

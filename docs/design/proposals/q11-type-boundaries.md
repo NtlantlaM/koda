@@ -1,12 +1,51 @@
 # Q11: Type boundaries, inference, nulls, and strings
 
-State: **AWAITING DECISION**. Selected option: **none**. All refinements inherit this state.
+State: **ACCEPTED**. Approved by the user on **2026-09-20**.
+
+Decision record: [ADR 0007](../../decisions/0007-q11-type-boundaries.md). The accepted decision is the explicit policy below, not wholesale acceptance of historical option A or its former recommendations. Other open questions remain AWAITING DECISION.
 
 ## Decision and why it matters
 
-Choose type identity, inference boundaries, generics, nullable refinement, equality, and string semantics. The baseline's nominal records and several restrictions were recommendations, not consequences of strong typing. These rules determine accepted programs and future API compatibility.
+Q11 decides type identity, inference boundaries, generics, nullable refinement, equality, string semantics, shadowing, and recursion. These rules determine accepted programs and future API compatibility. The user has now selected the following rules explicitly.
 
-## Alternatives
+## Accepted decision
+
+| Area | Accepted rule |
+| --- | --- |
+| Type identity | Koda-defined types use nominal identity. |
+| Function boundaries | Explicit parameter and return types are required. |
+| Inference | Local variable and call-result types are inferred. |
+| Generics | Small invariant user-defined generics are supported in v0.1; variance and advanced generic constraints are deferred. |
+| Nullable values | Support `T?`; reject explicitly written `T??`. Flatten nullable generic substitution where necessary so nested nullable layers are not observable language semantics. |
+| Null refinement | Support `match` and explicit null checks on stable immutable local bindings. Do not provide alias-aware mutable smart casts in v0.1. |
+| Equality | Support primitive equality in v0.1. Do not expose reference/object identity. Defer derived equality for user-defined value types; entity identity/equality belongs to the later persistence decision. |
+| String values | Unicode scalar-value semantics, with exact, non-normalizing equality. Reject invalid/lone surrogate values at foreign boundaries. |
+| String forms | Support string interpolation and multiline strings. Direct indexing and length semantics are deferred. |
+| Names | Reject local and parameter shadowing, including same-scope duplicate declarations. |
+| Recursion | Allow ordinary function recursion; defer recursive user-defined data types. |
+
+## Rationale and consequences
+
+Nominal identity and explicit function signatures make domain boundaries visible while inference keeps local code concise. Invariant generics provide reusable typed data without committing v0.1 to variance or advanced constraints. Stable immutable locals permit useful null-check refinement without alias-aware mutable flow analysis.
+
+Nullable substitution has one observable absence layer; explicitly writing a second suffix is an error. Primitive equality is available without introducing object identity or choosing persistence identity. Unicode scalar values and exact equality establish portable text semantics, while foreign boundaries must reject invalid values. Interpolation and multiline strings are supported features, but their spelling and detailed conversion/layout rules still need Q01 and related design work.
+
+Shadowing restrictions keep names unambiguous. Function recursion is available independently of recursive user-defined data types. The compiler will eventually need checks for these rules, but this decision does not authorize implementation.
+
+## Explicit deferrals and boundaries
+
+- Variance and advanced generic constraints are deferred.
+- Alias-aware mutable smart casts are not provided in v0.1.
+- Derived equality for user-defined value types is deferred.
+- Entity identity/equality remains a later persistence decision under Q09.
+- Direct string indexing and length semantics are deferred.
+- Recursive user-defined data types are deferred.
+
+Q01 still determines interpolation markers, multiline delimiters, escaping, indentation/newline handling, and relevant expression syntax; interpolation conversion rules must also be specified without implicitly accepting coercions. Q02 numeric semantics, Q03 mutation/aliasing, Q04 Result handling, Q06 foreign error reporting, and Q08 runtime representations remain unresolved. Q11 does not select additional null-refinement forms, type/value namespace rules, or broader release scope from the former recommendations.
+
+## Historical alternatives considered
+
+These alternatives and the comparisons below preserve proposal context. They are not the accepted policy; in particular, the user accepted stable-local null-check refinement as well as match refinement, and accepted interpolation and multiline strings.
 
 | Option | Policy | Advantages | Disadvantages |
 | --- | --- | --- | --- |
@@ -38,20 +77,6 @@ All preserve strong typing, type, T?, Result, and associated-data enums.
 | Interoperability | Explicit codecs | Traits can wrap foreign APIs | Natural shapes still need validation |
 | Compatibility | Can add richer abstractions later | Large early semantic commitment | Switching to nominal later breaks programs |
 
-## Recommendation, not acceptance
+## Recommendation history
 
-Recommend **A**, keeping v0.1 small and its correctness explainable. Each subchoice below is separately **AWAITING DECISION**; the recommendation does not close it.
-
-| Subchoice | Viable alternatives and tradeoffs | Recommended candidate |
-| --- | --- | --- |
-| Signatures | All annotated: clear; exported-only: concise; broad inference: body-dependent APIs | Annotate parameters/returns, infer locals/calls |
-| Generics | Built-ins only: minimal; small user generics: useful; constrained/variant: expressive/complex | Small invariant user generics; reject ambiguous inference |
-| Null refinement | Match only: simple; stable-binding if checks: convenient; alias-aware flow: powerful/complex | Match only initially |
-| Nested nullable | Flatten: simple; preserve layers: expressive/boxed; reject nullable substitution: restrictive | Flatten generic substitution; diagnose written T??; enums distinguish multiple absence meanings |
-| Equality | Primitive only: minimal; derived data equality: convenient; trait-based: extensible | Primitive equality initially, no observable record identity |
-| Strings | Scalar sequences: portable; UTF-16 code units: JS fit; graphemes: human-facing/costly | Scalar sequences, exact non-normalizing equality; reject lone surrogates at foreign boundaries; defer indexing/length API |
-| Shadowing | Allow: concise; warn: flexible; reject locals/parameters: unambiguous | Reject local/parameter shadowing and same-scope duplicates |
-| Recursive data | Defer: simplest; guarded recursion: useful; arbitrary recursive types: complex | Defer recursive data; allow ordinary function recursion |
-| Scope | Small synchronous core; add traits/collections now; only built-in generics | Small core with user generics; explicitly confirm all proposed deferrals |
-
-Before approval, compare same-shaped named records, ambiguous generic calls, nullable substitution, shadowing, and canonically equivalent text. Q01 determines spelling after semantics are chosen.
+The original recommendation was option A with match-only refinement; it did not include the user's interpolation and multiline-string approvals. The user selected the explicit policy above instead. The former recommendation and its broader scope suggestions are not independently accepted. See ADR 0007 for the authoritative decision and its limits.

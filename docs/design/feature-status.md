@@ -1,8 +1,8 @@
 # Feature status register
 
-All maturity statuses describe the initial design baseline. Nothing is implemented. ACCEPTED applies only to user-supplied principles; concrete semantics and proposed delivery scope remain AWAITING DECISION. The decision-state column applies to those details, not to reopening the user's explicit requirements. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
+Nothing is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
 
-- **ACCEPTED**: user-supplied design principle. Concrete detail and delivery scope require separate decisions.
+- **ACCEPTED**: user-supplied principle or expressly approved design decision. Details outside that approval require separate decisions.
 - **EXPERIMENTAL**: a candidate design requiring evaluation; syntax and semantics may change or be removed.
 - **LATER**: deliberately outside v0.1; no compatibility commitment.
 - **REJECTED**: excluded from the current language direction. Reconsideration requires an ADR.
@@ -12,15 +12,28 @@ All maturity statuses describe the initial design baseline. Nothing is implement
 | Standalone language, `.ko` files | ACCEPTED | v0.1; ADR 0001 | AWAITING DECISION |
 | Optional AI; compiler owns correctness | ACCEPTED | All stages; no AI dependency | AWAITING DECISION |
 | TypeScript compiler, JavaScript/Node.js backend | ACCEPTED | v0.1; ADR 0001 | AWAITING DECISION |
-| Strong static typing with local inference | ACCEPTED | v0.1; type rules must be frozen | AWAITING DECISION |
+| Explicit function parameter/return types; inferred locals and call results | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Immutable bindings by default, explicit `mut` | ACCEPTED | v0.1; aliasing details in Q03 | AWAITING DECISION |
-| Nullable `T?`, no implicit nullability | ACCEPTED | v0.1 | AWAITING DECISION |
+| Nullable `T?`; reject written `T??`; flatten nullable generic substitution | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
+| Null refinement via match and explicit checks on stable immutable locals | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
+| Alias-aware mutable smart casts | LATER | Not provided in v0.1; Q11 | ACCEPTED deferral |
 | Explicit `Result<T, E>` for recoverable failure | ACCEPTED | v0.1; no implicit error propagation | AWAITING DECISION |
 | Exhaustive pattern matching; associated-data enums | ACCEPTED | v0.1 | AWAITING DECISION |
-| Nominal application records declared with `type` | EXPERIMENTAL | v0.1 | AWAITING DECISION |
+| Nominal identity for Koda-defined types | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Functions, lexical scopes, modules, explicit exports | EXPERIMENTAL | v0.1 | AWAITING DECISION |
-| Generic records, enums, and functions | EXPERIMENTAL | v0.1; no higher-kinded types | AWAITING DECISION |
-| Numeric and string primitive model | EXPERIMENTAL | Freeze numbers in Q02 and strings in Q11 before compiler work | AWAITING DECISION |
+| Small invariant user-defined generics | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
+| Variance and advanced generic constraints | LATER | Deferred by Q11 | ACCEPTED deferral |
+| Numeric primitive model | EXPERIMENTAL | Q02 must resolve range and arithmetic behavior | AWAITING DECISION |
+| Primitive equality; no exposed reference/object identity | ACCEPTED | v0.1; Q11; numeric edge cases remain Q02 | ACCEPTED scope |
+| Derived equality for user-defined value types | LATER | Deferred by Q11 | ACCEPTED deferral |
+| Entity identity/equality | LATER | Deferred by Q11; persistence semantics remain Q09 | ACCEPTED deferral; Q09 AWAITING DECISION |
+| Unicode scalar-value strings; exact non-normalizing equality | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
+| Reject invalid/lone surrogates at foreign boundaries | ACCEPTED | Q11; error/adapter contract remains Q06 | ACCEPTED requirement |
+| String interpolation and multiline strings | ACCEPTED | Supported; spelling/layout/conversion details remain open | ACCEPTED features; Q01 AWAITING DECISION |
+| Direct string indexing and length semantics | LATER | Deferred by Q11 | ACCEPTED deferral |
+| Reject local/parameter shadowing and same-scope duplicates | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
+| Ordinary function recursion | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
+| Recursive user-defined data types | LATER | Deferred by Q11 | ACCEPTED deferral |
 | Concrete syntax and operator precedence in syntax spec | EXPERIMENTAL | Freeze in Q01 before parser work | AWAITING DECISION |
 | Traits and composition over inheritance | ACCEPTED | Direction; trait syntax/implementation LATER | AWAITING DECISION |
 | Entity distinct from ordinary application data | ACCEPTED | Direction; ADR 0003 | AWAITING DECISION |

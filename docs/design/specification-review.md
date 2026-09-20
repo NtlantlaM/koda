@@ -1,6 +1,6 @@
 # Review of the initial specification
 
-Review date: 2026-09-19. Unresolved choices: **AWAITING DECISION**.
+Review date: 2026-09-19. The findings below record the initial review. Update on 2026-09-20: [Q11 is ACCEPTED](../decisions/0007-q11-type-boundaries.md); all other unresolved questions remain **AWAITING DECISION**.
 
 ## Repository verification
 
@@ -30,6 +30,6 @@ Reviewed README, CONTRIBUTING, all seven specs, compiler architecture, feature r
 
 The user's explicit principles remain constraints: standalone .ko language, optional AI, compiler authority, readability/diagnostics, strong typing/inference, immutable defaults with mut, T?, Result, enums/matching, type/entity distinction, explicit writes, composition/traits, structured concurrency, one toolchain, TypeScript bootstrap, JavaScript/Node target, and no framework grammar.
 
-Old specs and ADRs remain a traceable baseline. Their concrete details are **AWAITING DECISION** where not explicitly supplied by the user. Examples retain their original proposed spelling rather than being rewritten to enact a recommendation. The freeze gate now also includes Q11. All deferrals remain proposals.
+Old specs and ADRs remain a traceable baseline. Concrete details not explicitly approved remain **AWAITING DECISION**. Q11's rules and explicit deferrals were approved on 2026-09-20 and conflicting specifications have been reconciled; other release-scope recommendations remain proposals. Examples retain their original illustrative spelling. The freeze gate includes the now-resolved Q11 and the still-unresolved Q01–Q08.
 
 See the [ordered decisions](open-questions.md). No executable code was added.

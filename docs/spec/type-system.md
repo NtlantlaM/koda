@@ -2,15 +2,17 @@
 
 > Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
 
-Status: **ACCEPTED** user principles: strong typing/inference, immutable defaults, null safety, explicit results, and enum matching. Nominality, exact checking rules, numeric representation, and aliasing are **EXPERIMENTAL / AWAITING DECISION** (Q11, Q02–Q04).
+Status: **ACCEPTED** Q11 rules are recorded in [ADR 0007](../decisions/0007-q11-type-boundaries.md), alongside the user principles of strong typing, immutable defaults, null safety, explicit results, and enum matching. Numeric behavior, mutation/aliasing, and Result enforcement remain **AWAITING DECISION** under Q02–Q04. Concrete syntax remains Q01.
 
 ## Types and inference
 
-Proposed primitives are `Bool`, `String`, `Int`, `Float`, and `Unit`. There is no user-visible `any`, implicit coercion, or automatic conversion from JavaScript values. Local binding types and generic call arguments are inferred from expressions and expected types. Function parameters and return types require annotations in v0.1, including private functions, to keep boundaries and diagnostics clear.
+Proposed primitives are `Bool`, `String`, `Int`, `Float`, and `Unit`. There is no user-visible `any`, implicit coercion, or automatic conversion from JavaScript values in the baseline proposal. Q11 accepts inference of local variable and call-result types, with explicit parameter and return types required at function boundaries, including private functions. Detailed generic-call inference rules remain to be specified; they must respect the accepted invariant generic model.
 
-An unconstrained `null` or `Ok`/`Err` type parameter needs context or an annotation; inference must not invent an unsafe type. Recursive functions use their declared signatures. Generic parameters are invariant initially. Generic bodies must type-check for all allowed substitutions; there are no trait constraints in v0.1, so unconstrained generic values cannot be added, ordered, or inspected as records.
+An unconstrained `null` or `Ok`/`Err` type parameter needs context or an annotation in the baseline inference proposal; inference must not invent an unsafe type. Ordinary function recursion is accepted and uses declared signatures. Small invariant user-defined generics are supported in v0.1; variance and advanced generic constraints are deferred. Generic bodies must type-check for their allowed substitutions; operations cannot be assumed for an unconstrained parameter.
 
-`type` declares nominal records. Two declarations with identical fields are distinct types. Every construction provides all fields exactly once; unknown fields are errors. No implicit structural subtyping or record inheritance is provided. `enum` declares a closed nominal set of variants, optionally carrying typed data.
+Koda-defined types have nominal identity. Two different `type` declarations with identical fields are distinct types; `enum` declarations are nominal as well. The baseline construction proposal requires every field exactly once and rejects unknown fields. No structural interchangeability follows solely from matching shapes. Recursive user-defined data types are deferred; this does not restrict ordinary function recursion.
+
+Local and parameter shadowing is rejected, including same-scope duplicate declarations. This does not choose Q01's type/value namespace or prelude-name rules.
 
 ## Mutability
 
@@ -24,7 +26,7 @@ Assignment to `let` is an error. The proposed v0.1 model makes record fields imm
 
 ## Nullable values
 
-`T?` contains a `T` value or `null`. `T` can be used where `T?` is expected; the reverse requires a check. `null` is not a value of non-nullable `T`. Nested nullable suffixes are rejected in the proposed subset.
+`T?` contains a `T` value or `null`. `T` can be used where `T?` is expected; the reverse requires a check. `null` is not a value of non-nullable `T`. Explicitly written `T??` is rejected. Nullable generic substitution flattens where necessary: substituting a nullable type for `T` in `T?` does not create an observable second absence layer.
 
 ```ko
 fn display(name: String?) -> String {
@@ -35,7 +37,7 @@ fn display(name: String?) -> String {
 }
 ```
 
-After the `null` arm, `value` binds the remaining non-null `String`. v0.1 uses match-based narrowing only; general control-flow refinement from `if value != null` is LATER. Accessing a field through `T?` without narrowing is an error. Foreign `undefined` is not automatically `null`; a boundary conversion must specify it.
+After the `null` arm, `value` binds the remaining non-null `String`. Null refinement is accepted both through `match` and explicit null checks on stable immutable local bindings. In a branch established by an explicit non-null check, such a local can be used as non-null. This does not authorize alias-aware mutable smart casts in v0.1 or extend the guarantee to mutable bindings or aliased properties. Additional control-flow forms and their spelling remain to be specified without weakening these limits. Access through a nullable value requires appropriate refinement. Foreign `undefined` mapping remains a Q06 decision.
 
 ## Results and matching
 
@@ -56,7 +58,13 @@ Match exhaustiveness covers enums, `Bool`, and nullable types. Matching open dom
 
 Candidate v0.1 model: `Int` is a checked safe integer backed by JavaScript numbers; `Float` is binary64. This is EXPERIMENTAL: Q02 must define range, overflow, division, remainder, non-finite values, and literal typing. Do not infer semantics from the backend's operators.
 
-Primitive equality compares values of the same type. String equality compares exact contents with no implicit normalization. Record/enum equality and identity comparisons are LATER; no JavaScript reference equality leaks into their public semantics. Ordering is numeric only in the candidate subset.
+Primitive equality is supported in v0.1. The candidate same-type comparison rule and precise numeric edge cases remain subject to Q02 and the remaining static-rule specification. Reference/object identity is not exposed. Derived equality for user-defined value types is deferred; entity identity/equality is a later persistence decision under Q09. Ordering remains numeric only in the baseline proposal.
+
+## Strings
+
+Strings have Unicode scalar-value semantics. Equality compares exact scalar-value sequences without normalization; canonical equivalence alone does not make differently represented sequences equal. Invalid/lone surrogate values are rejected at foreign boundaries; Q06 still determines the surrounding conversion/error contract.
+
+String interpolation and multiline strings are supported. Q01 must define their spelling, escaping, and multiline layout rules; interpolation conversion/formatting rules are not selected by this feature decision. Direct string indexing and length semantics are deferred. No UTF-16 code-unit indexing or implicit length definition is inherited from JavaScript.
 
 ## Failure boundary
 

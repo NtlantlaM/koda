@@ -3,6 +3,8 @@
 State: **AWAITING DECISION**. Selected option: **none**. All spellings remain proposals.
 Resolve after Q11/Q02–Q04, then reconcile imports/foreign/test declarations before freeze.
 
+Q11 is now ACCEPTED via [ADR 0007](../../decisions/0007-q11-type-boundaries.md). Its shadowing restrictions, interpolation, and multiline-string support constrain this proposal. Their remaining grammar details are still Q01; Q01 itself is not resolved.
+
 ## Decision and why it matters
 
 Choose statement termination, block values, record construction, generic calls, lexical policy, patterns, and reserved words. A grammar must let readers and the compiler interpret code without guessing from an AI's intent or future symbol tables.
@@ -49,7 +51,7 @@ Recommend **A**, using narrowly specified restrictions rather than symbol-depend
 | Explicit generic call | f<T>: familiar/needs lookahead; f::<T>: unambiguous/punctuation; f[T]: distinct/reserves indexing | f::<T>(...) while declarations/types retain angle brackets |
 | Pattern names | Bare names bind, variants qualified: clear; uppercase convention: implicit rule; explicit binding keyword: verbose | Bare bindings; qualified variants except prelude Ok/Err; reject shadowing per Q11 |
 | Identifiers | ASCII first: small; Unicode identifiers: inclusive/normalization rules; escaped identifiers: flexible | ASCII identifiers initially, UTF-8 strings/comments; Unicode identifier support deferred explicitly |
-| Comments/strings | Line comments/simple escapes: small; nested comments/raw strings: convenient; interpolation now: more grammar | Current simple set; no interpolation or nested block comments initially |
+| Comments/string spelling | Existing escapes plus explicit interpolation delimiters: familiar; raw/multiline delimiters: readable; indentation-sensitive multiline form: concise/layout rules | Preserve simple comments provisionally; choose interpolation/multiline spelling and layout under Q01. Feature support is already accepted in Q11, not a deferral option |
 | Keywords/namespaces | Fully reserved: stable/collisions; contextual: flexible/parser detail; extensible names: ambiguity | Reserve actual core words plus entity; contextual from; separate type/value namespaces, explicit collision rules for prelude names |
 | Operators | Fixed precedence: teachable; all parenthesized: verbose; user overloading: complex | Current fixed table; non-associative comparisons, short-circuit booleans, statement-only assignment |
 

@@ -24,7 +24,8 @@ This describes an adapter around a JavaScript function. It does not claim that t
 
 | Boundary value | Required policy |
 | --- | --- |
-| `String`, `Bool` | Validate runtime primitive kind; never coerce |
+| `String` | Q11 requires Unicode scalar values: reject invalid/lone surrogates; adapter/error details remain Q06 |
+| `Bool` | Proposed runtime primitive-kind validation; never coerce |
 | `Int` | Validate kind and chosen integer range |
 | `Float` | Validate kind and the chosen non-finite policy |
 | `T?` | Explicit `null` mapping; `undefined` requires a declared conversion |
