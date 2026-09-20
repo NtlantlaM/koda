@@ -36,3 +36,5 @@ Benefits, costs, limitations, and required follow-up.
 - [ADR 0009: Q03 mutation and aliasing](0009-q03-mutation-and-aliasing.md) — immutable core values, explicit rebinding, no v0.1 borrow checker.
 
 - [ADR 0010: Q04 Result obligations and beginner-first failure experience](0010-q04-result-obligations.md) — local must-handle Results, actionable diagnostics, optional AI assistance.
+
+- [ADR 0011: Q01 concrete syntax](0011-q01-concrete-syntax.md) — braces, significant newlines, minimal punctuation, beginner-friendly generic calls.
