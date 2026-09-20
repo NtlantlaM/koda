@@ -31,3 +31,6 @@ The accepted [Q03 decision](../docs/decisions/0009-q03-mutation-and-aliasing.md)
 
 
 The accepted [Q04 decision](../docs/decisions/0010-q04-result-obligations.md) adds future conformance obligations for reachable bare Result rejection, local Result abandonment/overwrite checks, explicit handling and transfer, deliberate-ignore visibility, and deterministic beginner-first diagnostics. Tests must also establish that baseline explanations and correctness do not require AI and that any mechanically safe edit classification comes from deterministic tooling.
+
+
+The accepted [Q01 decision](../docs/decisions/0011-q01-concrete-syntax.md) adds future syntax fixtures for significant newlines and continuation, bare immutable versus `mut` bindings, tail expressions and bare-return line boundaries, record/control-head disambiguation, `f<T>(...)` generic calls versus comparison tokens, interpolation and multiline indentation, comments, ASCII identifier limits, match catch-alls/qualified variants, and accepted numeric literal forms. Parser tests must demonstrate that these decisions do not depend on symbol-table or AI intent.
