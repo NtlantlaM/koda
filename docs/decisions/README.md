@@ -32,3 +32,5 @@ Which credible alternatives were considered?
 ## Consequences
 Benefits, costs, limitations, and required follow-up.
 ```
+
+- [ADR 0009: Q03 mutation and aliasing](0009-q03-mutation-and-aliasing.md) — immutable core values, explicit rebinding, no v0.1 borrow checker.
