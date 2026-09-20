@@ -1,6 +1,6 @@
 # Decisions before specification freeze
 
-Q11, Q02, Q03, and Q04 are **ACCEPTED** by explicit user decisions on 2026-09-20; see [ADR 0007](../decisions/0007-q11-type-boundaries.md), [ADR 0008](../decisions/0008-q02-numeric-semantics.md), [ADR 0009](../decisions/0009-q03-mutation-and-aliasing.md), and [ADR 0010](../decisions/0010-q04-result-obligations.md). Q01, Q05–Q10, and Q12–Q13 remain **AWAITING DECISION**, with no selected options.
+Q11, Q02, Q03, and Q04 are **ACCEPTED** by explicit user decisions on 2026-09-20; see [ADR 0007](../decisions/0007-q11-type-boundaries.md), [ADR 0008](../decisions/0008-q02-numeric-semantics.md), [ADR 0009](../decisions/0009-q03-mutation-and-aliasing.md), and [ADR 0010](../decisions/0010-q04-result-obligations.md). Q05–Q10 and Q12–Q13 remain **AWAITING DECISION**, with no selected options.
 
 Unresolved recommendations are advice, not accepted rules. The user's principles and explicit Q11 and Q02 decisions are constraints; assistant-authored details do not become approved merely by appearing in a specification or ADR. Feature maturity (ACCEPTED / EXPERIMENTAL / LATER / REJECTED) and decision state are separate.
 
@@ -14,7 +14,7 @@ Read the [specification review](specification-review.md). Each proposal below in
 | 2 (resolved) | [Q02: Numbers](proposals/q02-numbers.md) | Q11 | v0.1 freeze | ACCEPTED — ADR 0008 |
 | 3 (resolved) | [Q03: Mutation and aliasing](proposals/q03-mutability.md) | Q11 | v0.1 freeze | ACCEPTED — ADR 0009 |
 | 4 (resolved) | [Q04: Result obligations](proposals/q04-results.md) | Q02, Q03 | v0.1 freeze | ACCEPTED — ADR 0010 |
-| 5 | [Q01: Concrete syntax](proposals/q01-syntax.md) | Core semantic choices above | v0.1 freeze | AWAITING DECISION |
+| 5 (resolved) | [Q01: Concrete syntax](proposals/q01-syntax.md) | Core semantic choices above | v0.1 freeze | ACCEPTED — ADR 0011 |
 | 6 | [Q05: Projects and modules](proposals/q05-projects.md) | Q01 | v0.1 freeze | AWAITING DECISION |
 | 7 | [Q06: JavaScript/npm boundary](proposals/q06-interop.md) | Q02–Q05 | v0.1 freeze | AWAITING DECISION |
 | 8 | [Q08: JavaScript representations](proposals/q08-representation.md) | Q06 and core semantics | v0.1 freeze | AWAITING DECISION |
