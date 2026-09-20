@@ -1,6 +1,6 @@
 # Syntax specification proposal
 
-> Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
+> Q01 concrete syntax is **ACCEPTED** via [ADR 0011](../decisions/0011-q01-concrete-syntax.md). Later feature-specific syntax remains subject to its owning design question.
 
 Status: **EXPERIMENTAL** concrete syntax, pending Q01. The examples consistently use this proposal. This is a bounded grammar sketch, not yet a complete parser contract.
 
@@ -25,7 +25,7 @@ enumDecl     = "enum", identifier, [ typeParams ], "{", variants, "}" ;
 functionDecl = "fn", identifier, [ typeParams ], "(", parameters, ")",
                "->", typeRef, block ;
 typeRef      = identifier, [ "<", typeArgs, ">" ], [ "?" ] ;
-binding      = ( "let" | "mut" ), identifier, [ ":", typeRef ], "=", expression ;
+binding      = [ "mut" ], identifier, [ ":", typeRef ], "=", expression ;
 assignment   = identifier, "=", expression ;
 record       = identifier, "{", fieldValues, "}" ;
 matchExpr    = "match", expression, "{", matchArms, "}" ;
@@ -71,10 +71,15 @@ Record construction supplies every field explicitly; nullable fields are not aut
 | Logical AND | `&&` | Left, short-circuit |
 | Logical OR | `||` | Left, short-circuit |
 
-Assignment is a statement, not an expression. `?` is a type suffix only; no propagation operator is proposed for v0.1. Generic call arguments use `name<Type>(...)`; parsing against ordering operators is Q01. `+` accepts matching numeric operands or two strings; it never converts between them.
+Assignment is a statement, not an expression. `?` is a type suffix only; no propagation operator is proposed for v0.1. Generic call arguments use the accepted `name<Type>(...)` form. The parser resolves this form syntactically without Rust-style `::<...>` or symbol-dependent guessing. `+` accepts matching numeric operands or two strings; it never converts between them.
 
 `if` expressions require `else` when their value is used. `match` is an expression and must be exhaustive. Both constructs require compatible branch types. Match guards, destructuring records, loops, closures, and expression-bodied functions are outside this initial syntax subset.
 
 ## Accepted numeric constraints on the grammar sketch
 
 [Q02](numbers.md) accepts Int addition/subtraction/multiplication/division/remainder and unary negation; Float addition/subtraction/multiplication/division and unary negation. Numeric equality/ordering require matching typed operands. The proposed precedence table does not authorize Float remainder, power, or implicit mixed-type conversions. Numeric literal bases and exponent forms are accepted features, but precise tokens and API names remain Q01. Required constant-expression contexts and ordinary unreachable-code diagnostics must be specified separately; neither is defined by this sketch.
+
+
+## Q01 accepted lexical/surface additions
+
+ADR 0011 accepts bare inferred immutable bindings, explicit `mut` rebinding declarations, braces with significant statement newlines, no required semicolons, final block values, `{expression}` string interpolation, triple-double-quoted multiline strings with deterministic common-indentation removal, `//` and non-nesting `/* ... */` comments, ASCII v0.1 identifiers in UTF-8 source, qualified user enum variants with prelude Ok/Err exceptions, and `_` catch-all patterns. Explicit generic calls use `f<T>(...)`; Rust-style turbofish is not Koda v0.1 syntax. Q04 uses explicit match/return handling; no propagation operator is in the initial syntax freeze.
