@@ -1,0 +1,31 @@
+// ADR 0007: explicit parameter and return types at every boundary, inferred
+// locals and call results, and ordinary function recursion.
+import { print } from "koda:io"
+
+fn fib(n: Int) -> Int {
+    if n < 2 {
+        n
+    } else {
+        fib(n - 1) + fib(n - 2)
+    }
+}
+
+fn label(flag: Bool) -> String {
+    if flag {
+        "on"
+    } else {
+        "off"
+    }
+}
+
+fn scale(value: Float, factor: Float) -> Float {
+    value * factor
+}
+
+export fn main() -> Unit {
+    // Locals and call results are inferred; the boundaries above are not.
+    tenth = fib(10)
+    name = label(true)
+    scaled = scale(1.5, 2.0)
+    print("{name} {tenth} {scaled}")
+}

@@ -2,7 +2,11 @@
 
 > Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
 
-This directory is reserved for implementation after the Stage 0 design gate. It intentionally contains no package manifests, source stubs, or compiler implementation.
+This directory holds the toolchain. It currently contains the first executable
+slice - `compiler`, `runtime` and `cli` - described in
+[compiler slice 0](../docs/implementation/slice-0.md). The remaining
+responsibilities below are still unimplemented, and several of them wait on
+unresolved questions rather than on effort.
 
 ```text
 packages/

@@ -1,0 +1,32 @@
+// Forms this slice does not accept, each with its own explanation.
+import { print } from "koda:io"
+
+type User {
+    name: String
+    age: Int
+}
+
+enum Positional {
+    Paid(String)
+}
+
+enum Generic<T> {
+    Holds(value: T)
+}
+
+type GenericRecord<T> {
+    value: T
+}
+
+type NoSeparator {
+    first: String second: Int
+}
+
+export fn main() -> Unit {
+    user = User { name: "a", age: 1 }
+
+    // Payload values are given in order; a label is not part of a call.
+    status = Positional.Paid(reason: "x")
+
+    print(user.name)
+}

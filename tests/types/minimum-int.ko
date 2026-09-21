@@ -1,0 +1,32 @@
+// ADR 0008 S10, with the parenthesis rule resolved under Q01: the signed
+// minimum may be formed only by directly negating its magnitude. Parentheses
+// break that adjacency, so the positive numeral must inhabit Int on its own
+// first, which it cannot.
+fn direct() -> Int {
+    -9223372036854775808
+}
+
+fn directInEveryBase() -> Int {
+    -0x8000000000000000
+}
+
+fn withSeparators() -> Int {
+    -9_223_372_036_854_775_808
+}
+
+fn parenthesisedMagnitude() -> Int {
+    -(9223372036854775808)
+}
+
+fn bareMagnitude() -> Int {
+    9223372036854775808
+}
+
+fn magnitudeIsExactAsFloat() -> Float {
+    9223372036854775808
+}
+
+export fn main() -> Unit {
+    value = direct()
+    ignored = value
+}

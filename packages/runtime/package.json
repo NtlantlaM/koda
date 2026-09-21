@@ -1,0 +1,10 @@
+{
+  "name": "@koda/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./koda-runtime.mjs",
+  "exports": {
+    ".": "./koda-runtime.mjs"
+  }
+}

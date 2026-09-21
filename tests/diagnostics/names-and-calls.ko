@@ -1,0 +1,15 @@
+// Name resolution and call arity, with the beginner-first wording ADR 0010
+// requires: what happened, where, why, and what to do next.
+import { print } from "koda:io"
+
+fn greet(name: String, times: Int) -> String {
+    "{name} x {times}"
+}
+
+export fn main() -> Unit {
+    print(greet("Koda"))
+    print(greet("Koda", 2, 3))
+    print(gret("Koda", 1))
+    print(unknown)
+    print(greet)
+}

@@ -1,0 +1,33 @@
+// ADR 0007 defers recursive user-defined data types, so a type that contains
+// itself - directly, through another type, or through an enum payload - is
+// rejected rather than quietly accepted.
+type DirectlyRecursive {
+    label: String
+    next: DirectlyRecursive
+}
+
+type Left {
+    right: Right
+}
+
+type Right {
+    left: Left
+}
+
+enum Tree {
+    Leaf
+    Node(child: Tree)
+}
+
+// A type that merely mentions another, without a cycle, is fine.
+type Inner {
+    value: Int
+}
+
+type Outer {
+    inner: Inner
+}
+
+export fn main() -> Unit {
+    ignored = Outer { inner: Inner { value: 1 } }
+}

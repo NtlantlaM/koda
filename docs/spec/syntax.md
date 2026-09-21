@@ -44,7 +44,7 @@ type Person {
 
 enum GreetingError {
     MissingName,
-    InvalidName(String),
+    InvalidName(name: String),
 }
 
 fn greeting(person: Person) -> Result<String, GreetingError> {
@@ -79,6 +79,99 @@ Assignment is a statement, not an expression. `?` is a type suffix only; no prop
 
 [Q02](numbers.md) accepts Int addition/subtraction/multiplication/division/remainder and unary negation; Float addition/subtraction/multiplication/division and unary negation. Numeric equality/ordering require matching typed operands. The proposed precedence table does not authorize Float remainder, power, or implicit mixed-type conversions. Numeric literal bases and exponent forms are accepted features, but precise tokens and API names remain Q01. Required constant-expression contexts and ordinary unreachable-code diagnostics must be specified separately; neither is defined by this sketch.
 
+
+## Q01 follow-up details (accepted)
+
+Status: **ACCEPTED**. Approver: repository owner/user, by explicit instruction,
+2026-09-20. These fill in two details that [ADR 0011](../decisions/0011-q01-concrete-syntax.md)
+and [ADR 0008](numbers.md) expressly delegated to the string lexical rules and
+to Q01. They add no new construct and change no accepted semantics.
+
+### String escapes
+
+A double-quoted string supports `\n`, `\r`, `\t`, `\"` and `\\`.
+
+Interpolation uses `{expression}`. A **literal** interpolation brace is written
+`\{` or `\}`:
+
+```ko
+greeting = "Hello {name}"
+template = "Use \{name\} literally"
+```
+
+Both braces have an escape so that neither has to be inferred from context. An
+unrecognised escape is a lexical error rather than the escaped character.
+
+### Directly negated numerals and parentheses
+
+[Numeric semantics](numbers.md) permits the signed minimum to be formed by
+negating its magnitude directly. "Directly" means the numeral is the immediate
+operand of the unary minus, with no parentheses between them:
+
+```ko
+smallest = -9223372036854775808      // valid Int
+also     = -0x8000000000000000       // valid Int, any supported base
+```
+
+Parentheses end that adjacency. The parenthesised expression must inhabit its
+type on its own, before the negation applies, so the positive magnitude is
+rejected exactly as a bare one would be:
+
+```ko
+// invalid: 9223372036854775808 is not a valid Int on its own
+bad = -(9223372036854775808)
+```
+
+Negating an already typed minimum Int is an ordinary checked arithmetic fault,
+not a literal rule:
+
+```ko
+// compiles; faults at run time
+worse = -(-9223372036854775808)
+```
+
+### Special Float values are not literal syntax
+
+`NaN` and the infinities have **no literal spelling**. ADR 0008 S07 exposes them
+through named values and predicates whose spelling remains deferred, so a source
+program cannot write them as tokens and the grammar reserves nothing for them.
+
+A finite numeral that overflows is a separate matter and remains accepted: it
+rounds to a signed infinity as a *value*, per ADR 0008 S06.
+
+### Enum payloads: named declaration, positional construction
+
+Accepted 2026-09-21. A variant declares each payload value with a name and a
+type. Construction supplies the values **in declaration order**, without labels:
+
+```ko
+enum PaymentStatus {
+    Pending
+    Paid(transactionId: String)
+    Failed(reason: String)
+}
+
+paid = PaymentStatus.Paid("tx-42")
+failed = PaymentStatus.Failed("Declined")
+```
+
+The declared name documents and identifies the payload field. It is **not an
+argument label**, and this introduces no named or labelled argument form, here
+or in any other call. A variant declared without parentheses takes no values and
+is written bare, as `PaymentStatus.Pending`.
+
+A payload pattern binds fresh names, which need not match the declared field
+name:
+
+```ko
+PaymentStatus.Paid(id) => ...
+```
+
+The remaining details of patterns belong to the work that introduces `match`.
+
+The positional payload *declaration* shown in the pre-Q01 grammar sketch earlier
+in this document was stale and has been corrected; the named form above is
+authoritative.
 
 ## Q01 accepted lexical/surface additions
 

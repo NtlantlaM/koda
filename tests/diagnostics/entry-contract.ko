@@ -1,0 +1,8 @@
+// docs/spec/language.md: the entry module exports `main` with no parameters and
+// a Unit return.
+import { print } from "koda:io"
+
+fn main(argument: String) -> Int {
+    print(argument)
+    0
+}

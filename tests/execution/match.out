@@ -1,0 +1,15 @@
+Waiting
+Paid: tx-42
+Failed: card declined
+settled as tx-42
+not settled
+no payload
+one payload
+codes 0 1 2
+escalate: card declined
+queue: card declined
+nothing to escalate
+low then high
+statement: tx-42
+eval once
+Paid: tx-42

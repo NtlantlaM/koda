@@ -1,0 +1,25 @@
+// ADR 0008: checked signed 64-bit Int, truncating division, remainder taking
+// the dividend's sign, and integer bases with digit separators.
+import { print } from "koda:io"
+
+fn factorial(n: Int) -> Int {
+    if n <= 1 {
+        1
+    } else {
+        n * factorial(n - 1)
+    }
+}
+
+export fn main() -> Unit {
+    print("max {9223372036854775807}")
+    print("min {-9223372036854775808}")
+    print("separators {9_223_372_036_854_775_807}")
+    print("bases {0xFF} {0b1010} {0o755}")
+
+    print("divide {7 / 2} {-7 / 2} {7 / -2} {-7 / -2}")
+    print("remainder {7 % 3} {-7 % 3} {7 % -3} {-7 % -3}")
+    print("minimum remainder {-9223372036854775808 % -1}")
+
+    // 20! stays exact only because Int is not a binary64 number.
+    print("factorial {factorial(20)}")
+}

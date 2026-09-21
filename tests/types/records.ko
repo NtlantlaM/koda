@@ -1,0 +1,79 @@
+// Record construction and field access must supply every field exactly once,
+// reject unknown fields, and keep nominal types apart (docs/spec/type-system.md).
+import { print } from "koda:io"
+
+type User {
+    name: String
+    age: Int
+}
+
+// Same shape, different declaration: ADR 0007 makes these distinct types.
+type Visitor {
+    name: String
+    age: Int
+}
+
+type Repeated {
+    label: String
+    label: Int
+}
+
+type Unknown {
+    owner: Missing
+}
+
+fn takesUser(user: User) -> String {
+    user.name
+}
+
+fn missingField() -> User {
+    User { name: "a" }
+}
+
+fn missingSeveral() -> User {
+    User { }
+}
+
+fn unknownField() -> User {
+    User { name: "a", age: 1, nickname: "b" }
+}
+
+fn misspelledField() -> User {
+    User { name: "a", aeg: 1 }
+}
+
+fn wrongFieldType() -> User {
+    User { name: 1, age: "old" }
+}
+
+fn duplicateEntry() -> User {
+    User { name: "a", name: "b", age: 1 }
+}
+
+fn structuralIsNotNominal() -> String {
+    visitor = Visitor { name: "a", age: 1 }
+    takesUser(visitor)
+}
+
+fn noSuchField() -> Int {
+    user = User { name: "a", age: 1 }
+    user.height
+}
+
+fn fieldOfPrimitive() -> Int {
+    count = 1
+    count.length
+}
+
+fn typeIsNotAValue() -> String {
+    takesUser(User)
+}
+
+fn recordIsNotCallable() -> String {
+    takesUser(User("a", 1))
+}
+
+export fn main() -> Unit {
+    ignored = takesUser(User { name: "a", age: 1 })
+    print(ignored)
+}

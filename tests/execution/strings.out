@@ -1,0 +1,8 @@
+cart has 3 items at 0.5
+joined: left-right
+escapes: "quoted" \ backslash {braced}
+tab:	and newline follows
+unicode: ü 漢 🌍
+different
+same
+empty is []

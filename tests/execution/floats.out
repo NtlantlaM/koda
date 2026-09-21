@@ -1,0 +1,12 @@
+sum 0.30000000000000004
+quotient 0.3333333333333333
+integral 2.0
+negative zero -0.0
+overflow Infinity
+infinity divide Infinity
+nan text NaN
+nan equals itself no
+nan less than one no
+nan not equal yes
+zeros equal yes
+retargeted 2.0

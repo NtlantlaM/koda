@@ -1,0 +1,23 @@
+{
+  "name": "koda-toolchain",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/compiler",
+    "packages/runtime",
+    "packages/cli"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc --build packages/compiler packages/cli",
+    "clean": "tsc --build --clean packages/compiler packages/cli",
+    "test": "npm run build && node --test \"packages/*/dist/test/**/*.test.js\"",
+    "koda": "node packages/cli/dist/src/main.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.1",
+    "typescript": "5.7.3"
+  }
+}

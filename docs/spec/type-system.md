@@ -50,6 +50,15 @@ enum Result<T, E> {
 }
 ```
 
+This sketch predates the accepted rule that an enum payload is declared with
+**named** fields ([syntax](syntax.md#enum-payloads-named-declaration-positional-construction),
+accepted 2026-09-21), so it is shown here positionally. The payload names of the
+prelude `Result` are **not chosen**: ADR 0008 leaves "Q04/Q06 error names,
+payloads and boundary wrapping" as remaining integration work, and no decision
+supplies them. Construction is positional either way, so `Ok(value)` and
+`Err(error)` are written the same regardless of what the fields end up being
+called.
+
 `Result<T, E>` is an ordinary closed enum with prelude constructor names `Ok` and `Err`. It is not an exception mechanism. A function handles a result with `match`, returns it, or stores it for subsequent handling. No implicit unwrapping or propagation occurs. A bare Result-valued expression statement is a compile error; an unused Result binding also needs a diagnostic. The exact severity and explicit-discard policy are Q04; the compiler does not claim that passing or storing a result proves meaningful business-level handling.
 
 Match exhaustiveness covers enums, `Bool`, and nullable types. Matching open domains such as numbers and strings requires a catch-all binding or `_`. Arms are considered in order; unreachable arms are diagnosed. Each variant's payload must have the correct arity. All value-producing arms must agree on a type, allowing only explicit nullable injection. No implicit union inference is proposed.

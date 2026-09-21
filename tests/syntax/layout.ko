@@ -1,0 +1,35 @@
+// ADR 0011 layout: significant newlines, continuation after a binary operator,
+// no semicolons, final block expressions, bare `return`, and comments.
+import { print } from "koda:io"
+
+/* A block comment.
+   It does not nest in v0.1. */
+fn total(a: Int, b: Int, c: Int) -> Int {
+    a +
+        b +
+        c
+}
+
+fn spread(
+    first: String,
+    second: String,
+) -> String {
+    first + second
+}
+
+fn early(flag: Bool) -> Unit {
+    if flag {
+        return
+    }
+    print("continued")
+}
+
+export fn main() -> Unit {
+    print("total {total(1, 2, 3)}")
+    print(spread(
+        "left",
+        "right",
+    ))
+    early(true)
+    early(false)
+}

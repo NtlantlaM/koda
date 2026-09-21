@@ -6,17 +6,36 @@ Koda is a standalone, open-source programming language for humans and AI to buil
 
 Koda source files use `.ko`. The initial compiler will be written in TypeScript and target JavaScript running on Node.js. TypeScript is an implementation choice, not Koda's language definition.
 
-**Repository stage: language design.** This repository contains specifications, architecture proposals, decision records, and illustrative programs. There is no compiler, runtime, CLI, or working package manager yet. Examples are not executable or compiler-validated.
+**Repository stage: language design, plus a first executable compiler slice.**
+The specifications, architecture proposals and decision records remain the
+source of truth. Alongside them, [compiler slice 0](docs/implementation/slice-0.md)
+compiles a single-module subset of the accepted language to JavaScript and runs
+it on Node.
+
+The slices are small on purpose. They implement only constructs governed by
+already-accepted decisions, and report every other construct as an explicit
+unsupported-feature diagnostic, so that building them did not answer any open
+question by accident. [Slice 1A](docs/implementation/slice-1a.md) adds `type`
+declarations, record construction, field access, and `enum` declarations with
+variants and payloads; [slice 1B](docs/implementation/slice-1b.md) adds
+`match` over enums, with payload patterns and exhaustiveness checking.
+Nullable types, generics, `Result`, multi-module programs and npm interop are
+**not** implemented, and matching is limited to enum values. There is no
+formatter, test runner or package manager. Some `examples/` programs use
+constructs the slices do not cover; `examples/README.md` says which ones run.
 
 ## Start here
 
 - [Documentation index](docs/README.md)
 - [Language principles and scope](docs/spec/language.md)
 - [Feature status register](docs/design/feature-status.md)
-- [Ordered decisions — Q11 and Q02 ACCEPTED; other questions AWAITING DECISION](docs/design/open-questions.md)
+- [Ordered decisions — Q01, Q02, Q03, Q04 and Q11 ACCEPTED; Q05–Q10 and Q12–Q13 AWAITING DECISION](docs/design/open-questions.md)
 - [Complete specification review and repository verification](docs/design/specification-review.md)
 - [Staged v0.1 roadmap](docs/roadmap.md)
 - [Example programs](examples/README.md)
+- [Compiler slice 0 - the first executable slice](docs/implementation/slice-0.md)
+- [Compiler slice 1A - user-defined data](docs/implementation/slice-1a.md)
+- [Compiler slice 1B - match and enum patterns](docs/implementation/slice-1b.md)
 
 ## Repository map
 
@@ -31,8 +50,23 @@ docs/
 examples/
   core/                  Proposed v0.1 syntax
   experimental/          Persistence and concurrency design sketches
-packages/                Future TypeScript package layout; documentation only
-tests/                   Future conformance strategy; documentation only
+packages/
+  compiler/              Sources, diagnostics, lexer, parser, checker, IR, emitter
+  runtime/               Minimal support for generated programs
+  cli/                   The single koda command
+tests/                   Conformance fixtures for the implemented subset
 ```
 
-Contribute through [the design contribution guide](CONTRIBUTING.md). No implementation or installation commands are available yet.
+## Try the slice
+
+```bash
+npm install
+npm run build
+npm test
+
+node packages/cli/dist/src/main.js run tests/execution/hello.ko
+```
+
+Contribute through [the design contribution guide](CONTRIBUTING.md). There is no
+installable release, and the command surface above is provisional pending Q05
+and Q07.

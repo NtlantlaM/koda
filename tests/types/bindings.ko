@@ -1,0 +1,36 @@
+// ADR 0009: bindings are immutable by default and `mut` permits rebinding to
+// another value of the same type. ADR 0007 rejects shadowing and duplicates.
+import { print } from "koda:io"
+
+fn rebind() -> Int {
+    mut count = 0
+    count = count + 1
+    count
+}
+
+fn assignImmutable() -> Int {
+    total = 1
+    total = 2
+    total
+}
+
+fn changeType() -> Int {
+    mut value = 1
+    value = "text"
+    value
+}
+
+fn shadowParameter(name: String) -> String {
+    name = "other"
+    name
+}
+
+fn duplicateLocal() -> Int {
+    value = 1
+    mut value = 2
+    value
+}
+
+export fn main() -> Unit {
+    print("{rebind()}")
+}

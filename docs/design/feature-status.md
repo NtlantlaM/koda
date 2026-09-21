@@ -1,6 +1,9 @@
 # Feature status register
 
-Nothing is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md), [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md), and [Q03 / ADR 0009](../decisions/0009-q03-mutation-and-aliasing.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
+Maturity and decision state describe the language, not the implementation. A
+first executable compiler slice exists ([slice 0](../implementation/slice-0.md));
+a feature being implemented there does not change its row, and a row being
+ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md), [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md), and [Q03 / ADR 0009](../decisions/0009-q03-mutation-and-aliasing.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
 
 - **ACCEPTED**: user-supplied principle or expressly approved design decision. Details outside that approval require separate decisions.
 - **EXPERIMENTAL**: a candidate design requiring evaluation; syntax and semantics may change or be removed.

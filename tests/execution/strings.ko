@@ -1,0 +1,33 @@
+// ADR 0007: Unicode scalar-value strings with exact, non-normalising equality.
+// ADR 0011: double quotes, `{expression}` interpolation, and `+` joining two
+// strings without converting anything.
+import { print } from "koda:io"
+
+fn describe(name: String, count: Int, ratio: Float) -> String {
+    "{name} has {count} items at {ratio}"
+}
+
+fn same(a: String, b: String) -> String {
+    if a == b {
+        "same"
+    } else {
+        "different"
+    }
+}
+
+export fn main() -> Unit {
+    print(describe("cart", 3, 0.5))
+    print("joined: " + "left" + "-" + "right")
+    print("escapes: \"quoted\" \\ backslash \{braced\}")
+    print("tab:\tand newline follows")
+
+    // Unicode is allowed in strings even though identifiers are ASCII.
+    print("unicode: ü 漢 🌍")
+
+    // Exact scalar comparison: precomposed and decomposed forms differ.
+    print(same("é", "é"))
+    print(same("koda", "koda"))
+
+    empty = ""
+    print("empty is [{empty}]")
+}

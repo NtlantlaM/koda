@@ -3,7 +3,7 @@ import { print } from "koda:io"
 
 enum GreetingError {
     MissingName,
-    ReservedName(String),
+    ReservedName(name: String),
 }
 
 fn greet(name: String) -> Result<String, GreetingError> {

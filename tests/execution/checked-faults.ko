@@ -1,0 +1,15 @@
+// ADR 0008: integer division by zero is a source-located checked fault, not a
+// Result and not a silent value. docs/spec/language.md requires a runtime entry
+// failure to produce a diagnostic and a nonzero exit.
+import { print } from "koda:io"
+
+fn divide(a: Int, b: Int) -> Int {
+    a / b
+}
+
+export fn main() -> Unit {
+    print("start")
+    print("safe {divide(10, 2)}")
+    print("unsafe {divide(1, 0)}")
+    print("never reached")
+}

@@ -1,0 +1,120 @@
+// Match checking: exhaustiveness, arm order, payload arity and arm result
+// types (docs/spec/type-system.md).
+import { print } from "koda:io"
+
+enum PaymentStatus {
+    Pending
+    Paid(transactionId: String)
+    Failed(reason: String)
+}
+
+enum Priority {
+    Low
+    High
+}
+
+type Point {
+    x: Int
+}
+
+fn missingOneVariant(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Pending => "a"
+        PaymentStatus.Paid(id) => id
+    }
+}
+
+fn missingSeveralVariants(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Pending => "a"
+    }
+}
+
+fn variantOfAnotherEnum(status: PaymentStatus) -> String {
+    match status {
+        Priority.High => "a"
+        _ => "b"
+    }
+}
+
+fn unknownVariant(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Cancelled => "a"
+        _ => "b"
+    }
+}
+
+fn payloadArityTooMany(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Paid(a, b) => a
+        _ => "b"
+    }
+}
+
+fn payloadNotNamed(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Paid => "a"
+        _ => "b"
+    }
+}
+
+fn payloadOnPlainVariant(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Pending(x) => "a"
+        _ => "b"
+    }
+}
+
+fn duplicateVariantArm(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Pending => "a"
+        PaymentStatus.Pending => "b"
+        _ => "c"
+    }
+}
+
+fn unreachableAfterCatchAll(status: PaymentStatus) -> String {
+    match status {
+        _ => "a"
+        PaymentStatus.Paid(id) => id
+    }
+}
+
+fn redundantCatchAll(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Pending => "a"
+        PaymentStatus.Paid(id) => id
+        PaymentStatus.Failed(reason) => reason
+        _ => "d"
+    }
+}
+
+fn incompatibleArmTypes(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Pending => "a"
+        PaymentStatus.Paid(id) => 1
+        PaymentStatus.Failed(reason) => reason
+    }
+}
+
+fn matchOnNonEnum(point: Point) -> String {
+    match point {
+        _ => "a"
+    }
+}
+
+fn matchOnPrimitive(flag: Bool) -> String {
+    match flag {
+        _ => "a"
+    }
+}
+
+fn bareBindingPattern(status: PaymentStatus) -> String {
+    match status {
+        anything => "a"
+    }
+}
+
+export fn main() -> Unit {
+    print("unused")
+}

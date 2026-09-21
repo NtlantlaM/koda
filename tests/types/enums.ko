@@ -1,0 +1,78 @@
+// Enum declarations, variants and payloads. Variants are qualified by their
+// enum (ADR 0011) and nominal (ADR 0007).
+enum PaymentStatus {
+    Pending
+    Paid(transactionId: String)
+    Failed(reason: String)
+}
+
+enum Repeated {
+    Same
+    Same(why: String)
+}
+
+enum RepeatedPayload {
+    Both(value: Int, value: String)
+}
+
+enum UnknownPayload {
+    Holds(thing: Missing)
+}
+
+// Same variant names, different declaration: still a different type.
+enum OtherStatus {
+    Pending
+}
+
+fn takesStatus(status: PaymentStatus) -> PaymentStatus {
+    status
+}
+
+fn nonexistentVariant() -> PaymentStatus {
+    PaymentStatus.Cancelled
+}
+
+fn misspelledVariant() -> PaymentStatus {
+    PaymentStatus.Pendng
+}
+
+fn payloadMissing() -> PaymentStatus {
+    PaymentStatus.Paid
+}
+
+fn payloadTooMany() -> PaymentStatus {
+    PaymentStatus.Paid("a", "b")
+}
+
+fn payloadWrongType() -> PaymentStatus {
+    PaymentStatus.Failed(404)
+}
+
+fn payloadOnPlainVariant() -> PaymentStatus {
+    PaymentStatus.Pending("why")
+}
+
+fn enumsAreNominal() -> PaymentStatus {
+    takesStatus(OtherStatus.Pending)
+}
+
+fn enumIsNotARecord() -> PaymentStatus {
+    PaymentStatus { transactionId: "a" }
+}
+
+fn enumIsNotAValue() -> PaymentStatus {
+    takesStatus(PaymentStatus)
+}
+
+fn enumHasNoFields() -> String {
+    status = PaymentStatus.Paid("tx")
+    status.transactionId
+}
+
+fn enumsHaveNoEquality() -> Bool {
+    PaymentStatus.Pending == PaymentStatus.Pending
+}
+
+export fn main() -> Unit {
+    ignored = takesStatus(PaymentStatus.Pending)
+}

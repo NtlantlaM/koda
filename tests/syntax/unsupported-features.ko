@@ -1,0 +1,34 @@
+// Accepted v0.1 features this compiler slice does not implement yet. Each one
+// must say so explicitly rather than be parsed approximately.
+//
+// `type` and `enum` moved out of this list in slice 1A, and `match` in slice
+// 1B; their fixtures live in tests/types/ alongside the rest.
+import { print } from "koda:io"
+
+type Person {
+    name: String
+}
+
+enum Mood {
+    Calm
+}
+
+entity Account {
+    id: Int
+}
+
+fn generic<T>(value: T) -> T {
+    value
+}
+
+export fn main() -> Unit {
+    person = Person { name: "a" }
+    nickname: String? = null
+
+    // Matching is implemented for enums; Bool and nullable scrutinees are not.
+    mood = match person {
+        _ => "any"
+    }
+
+    print(mood)
+}

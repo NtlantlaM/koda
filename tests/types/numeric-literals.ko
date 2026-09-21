@@ -1,0 +1,47 @@
+// ADR 0008 contextual literal typing. An annotation, a parameter position or a
+// declared return position may supply the expected numeric type; a sibling
+// operand never does, and every retarget must be exact.
+fn takesFloat(value: Float) -> Float {
+    value
+}
+
+fn mixed() -> Float {
+    // An independently supplied Float expectation reaches both literals.
+    1 + 1.0
+}
+
+fn unexpected() -> Bool {
+    // No expectation reaches these, so each takes its default type.
+    1 + 1.0 == 2.0
+}
+
+fn tooLarge() -> Int {
+    9223372036854775808
+}
+
+fn minimum() -> Int {
+    -9223372036854775808
+}
+
+fn fractionAsInt() -> Int {
+    1.5
+}
+
+fn inexactAsFloat() -> Float {
+    9007199254740993
+}
+
+fn exactAsFloat() -> Float {
+    9223372036854775808
+}
+
+fn negativeZeroAsInt() -> Int {
+    -0.0
+}
+
+export fn main() -> Unit {
+    // A parameter position supplies the expected type, so 2 becomes a Float.
+    rounded = takesFloat(2)
+    exact: Float = rounded
+    ignored = exact
+}

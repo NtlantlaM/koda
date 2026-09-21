@@ -1,0 +1,26 @@
+// ADR 0008 S07 exposes special Float values through named values and APIs whose
+// spelling is deferred. They are deliberately NOT special literal tokens, so
+// these names resolve like any other unknown name rather than producing a
+// non-finite Float.
+fn notANumber() -> Float {
+    NaN
+}
+
+fn positiveInfinity() -> Float {
+    Infinity
+}
+
+fn negativeInfinity() -> Float {
+    -Infinity
+}
+
+// A finite numeral that overflows, by contrast, IS accepted and rounds to a
+// signed infinity (ADR 0008 S06). That is a value, not a literal spelling.
+fn overflowsToInfinity() -> Float {
+    1e999
+}
+
+export fn main() -> Unit {
+    value = overflowsToInfinity()
+    ignored = value
+}

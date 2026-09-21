@@ -1,0 +1,9 @@
+// Q05 (modules) and Q06 (npm interop) are unresolved, so anything beyond the
+// single standard library module must say so rather than be guessed at.
+import { greeting } from "./greeting.ko"
+import { readFile } from "npm:node:fs"
+import { print, format } from "koda:io"
+
+export fn main() -> Unit {
+    print("unused")
+}

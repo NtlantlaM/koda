@@ -1,0 +1,12 @@
+eval left
+eval right
+sum 3
+eval outer
+eval cond
+eval then
+mixed 12
+test first
+test third
+short-circuited or
+guard true 0
+guard false 6

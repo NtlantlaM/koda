@@ -1,0 +1,59 @@
+// Pattern bindings are local to their arm, take their type from the declared
+// payload field, and obey ADR 0007's no-shadowing rule.
+import { print } from "koda:io"
+
+enum Box {
+    Empty
+    Holds(content: String)
+    Counted(amount: Int)
+    Pair(first: String, second: String)
+}
+
+// The binding's type comes from the declaration, so this is an Int mismatch.
+fn bindingHasThePayloadType(box: Box) -> String {
+    match box {
+        Box.Counted(n) => n
+        _ => "none"
+    }
+}
+
+fn bindingDoesNotLeak(box: Box) -> Unit {
+    match box {
+        Box.Holds(content) => print(content)
+        _ => print("none")
+    }
+    print(content)
+}
+
+fn bindingCannotShadowALocal(box: Box) -> String {
+    content = "outer"
+    match box {
+        Box.Holds(content) => content
+        _ => content
+    }
+}
+
+fn bindingCannotShadowAParameter(box: Box, amount: Int) -> Int {
+    match box {
+        Box.Counted(amount) => amount
+        _ => 0
+    }
+}
+
+fn bindingCannotShadowAFunction(box: Box) -> String {
+    match box {
+        Box.Holds(bindingDoesNotLeak) => bindingDoesNotLeak
+        _ => "none"
+    }
+}
+
+fn twoBindingsCannotRepeat(box: Box) -> String {
+    match box {
+        Box.Pair(same, same) => same
+        _ => "none"
+    }
+}
+
+export fn main() -> Unit {
+    print("unused")
+}

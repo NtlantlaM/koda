@@ -1,0 +1,44 @@
+// docs/spec/language.md: expressions evaluate left to right and arguments are
+// evaluated before the call. docs/architecture/compiler.md additionally
+// requires side-effecting operands to run exactly once when a construct is
+// lowered, and `&&`/`||` to short-circuit.
+import { print } from "koda:io"
+
+fn trace(label: String, value: Int) -> Int {
+    print("eval " + label)
+    value
+}
+
+fn loud(label: String, answer: Bool) -> Bool {
+    print("test " + label)
+    answer
+}
+
+// An `if` in value position must not swallow a `return` that belongs here.
+fn guard(flag: Bool) -> Int {
+    value = if flag {
+        return 0
+    } else {
+        5
+    }
+    value + 1
+}
+
+export fn main() -> Unit {
+    print("sum {trace("left", 1) + trace("right", 2)}")
+
+    // The left operand must still be evaluated first, and once, even though
+    // the right operand lowers to statements.
+    mixed = trace("outer", 10) + (if trace("cond", 1) == 1 { trace("then", 2) } else { trace("else", 3) })
+    print("mixed {mixed}")
+
+    if loud("first", false) && loud("second", true) {
+        print("unreachable")
+    }
+    if loud("third", true) || loud("fourth", true) {
+        print("short-circuited or")
+    }
+
+    print("guard true {guard(true)}")
+    print("guard false {guard(false)}")
+}

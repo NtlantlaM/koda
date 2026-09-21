@@ -52,6 +52,17 @@ export fn main() -> Unit {
 
 Proposed v0.1 restrictions: no executable top-level statements, no module cycles, no wildcard exports, and no import escape outside declared package roots. Paths use exact case across platforms; the resolver must diagnose mismatches even on case-insensitive filesystems. Symlink and package-root resolution rules are Q05. Entry `main` is invoked by the generated launcher, never as an import side effect.
 
+## Relationship to compiler slice 0
+
+[Compiler slice 0](../implementation/slice-0.md) accepts exactly one import,
+`import { print } from "koda:io"`, and one entry form, an exported `main`.
+Neither settles anything in this document. `print` is a **compiler and runtime
+intrinsic** that the slice exposes through a provisional import spelling so that
+a program can produce output at all; the slice resolves no file, has no module
+graph, and implements no manifest. Module resolution, export visibility, the
+`koda:` namespace, the entry contract's tooling surface and the manifest remain
+**AWAITING DECISION** under Q05 and Q07, and may replace that spelling outright.
+
 ## Single toolchain surface
 
 All commands below are proposed, not available:

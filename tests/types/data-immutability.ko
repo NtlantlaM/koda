@@ -1,0 +1,37 @@
+// ADR 0009: ordinary records are transitively immutable values. `mut` allows a
+// binding to be rebound; it never makes a field assignable.
+type User {
+    name: String
+}
+
+type Account {
+    owner: User
+}
+
+fn assignField() -> User {
+    user = User { name: "a" }
+    user.name = "b"
+    user
+}
+
+fn assignFieldOfMutable() -> User {
+    mut user = User { name: "a" }
+    user.name = "b"
+    user
+}
+
+fn assignNestedField() -> Account {
+    account = Account { owner: User { name: "a" } }
+    account.owner.name = "b"
+    account
+}
+
+fn rebindToAnotherTypeFails() -> User {
+    mut user = User { name: "a" }
+    user = Account { owner: User { name: "b" } }
+    user
+}
+
+export fn main() -> Unit {
+    ignored = assignField()
+}

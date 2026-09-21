@@ -1,0 +1,122 @@
+// Slice 1B: `match` over an enum. Arms are considered in order, payload
+// patterns bind fresh locals, and `_` covers the rest
+// (docs/spec/type-system.md, ADR 0011).
+import { print } from "koda:io"
+
+enum PaymentStatus {
+    Pending
+    Paid(transactionId: String)
+    Failed(reason: String)
+}
+
+enum Priority {
+    Low
+    High
+}
+
+// Exhaustive without a catch-all, used as the function's value.
+fn describe(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Pending =>
+            "Waiting"
+
+        PaymentStatus.Paid(id) =>
+            "Paid: {id}"
+
+        PaymentStatus.Failed(reason) =>
+            "Failed: {reason}"
+    }
+}
+
+// A catch-all makes the remaining variants exhaustive.
+fn isSettled(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Paid(id) => "settled as {id}"
+        _ => "not settled"
+    }
+}
+
+// `_` in a payload position ignores a value that is not needed.
+fn shape(status: PaymentStatus) -> String {
+    match status {
+        PaymentStatus.Pending => "no payload"
+        PaymentStatus.Paid(_) => "one payload"
+        PaymentStatus.Failed(_) => "one payload"
+    }
+}
+
+// An arm body may be a block, and may return from the enclosing function.
+fn code(status: PaymentStatus) -> Int {
+    match status {
+        PaymentStatus.Pending => {
+            return 0
+        }
+        PaymentStatus.Paid(id) => {
+            marker = id
+            1
+        }
+        PaymentStatus.Failed(reason) => {
+            marker = reason
+            2
+        }
+    }
+}
+
+// A match nested inside another match arm.
+fn escalate(status: PaymentStatus, priority: Priority) -> String {
+    match status {
+        PaymentStatus.Failed(reason) =>
+            match priority {
+                Priority.High => "escalate: {reason}"
+                Priority.Low => "queue: {reason}"
+            }
+        _ => "nothing to escalate"
+    }
+}
+
+// Two separate enums keep their own variants.
+fn label(priority: Priority) -> String {
+    match priority {
+        Priority.Low => "low"
+        Priority.High => "high"
+    }
+}
+
+fn trace(label: String, status: PaymentStatus) -> PaymentStatus {
+    print("eval " + label)
+    status
+}
+
+export fn main() -> Unit {
+    pending = PaymentStatus.Pending
+    paid = PaymentStatus.Paid("tx-42")
+    failed = PaymentStatus.Failed("card declined")
+
+    print(describe(pending))
+    print(describe(paid))
+    print(describe(failed))
+
+    print(isSettled(paid))
+    print(isSettled(pending))
+
+    print(shape(pending))
+    print(shape(paid))
+
+    print("codes {code(pending)} {code(paid)} {code(failed)}")
+
+    print(escalate(failed, Priority.High))
+    print(escalate(failed, Priority.Low))
+    print(escalate(paid, Priority.High))
+
+    print(label(Priority.Low) + " then " + label(Priority.High))
+
+    // Used as a statement, where the match produces Unit.
+    match paid {
+        PaymentStatus.Pending => print("statement: waiting")
+        PaymentStatus.Paid(id) => print("statement: {id}")
+        PaymentStatus.Failed(reason) => print("statement: {reason}")
+    }
+
+    // The scrutinee is evaluated exactly once.
+    print(describe(trace("once", paid)))
+}

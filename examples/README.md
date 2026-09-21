@@ -2,7 +2,18 @@
 
 > Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
 
-These files are design examples, not runnable programs today. `core/` consistently uses the EXPERIMENTAL syntax proposal for ACCEPTED v0.1 feature directions. They have not passed a Koda compiler; none exists. Expected output is a future conformance target.
+These files are design examples and are not part of the compiler's test suite; the fixtures under
+`tests/` are the programs that are actually compiled and executed on every run.
+
+Checked against [compiler slice 1B](../docs/implementation/slice-1b.md), `core/hello.ko` compiles and
+prints its expected output, and `core/modules/greeting.ko` compiles on its own. The rest do not:
+`data-and-null.ko` needs nullable types and `match`; `mutability-and-generics.ko` needs generics
+and uses the `let` spelling that ADR 0011 rejected; `core/modules/main.ko` needs relative imports,
+which wait on Q05. Those are gaps in the implementation, not defects in the examples.
+
+`results-and-enums.ko` declared a positional enum payload, which contradicted ADR 0011; it now uses
+the accepted named form, `ReservedName(name: String)`. Its enum and its `match` now work; it still needs `Result`, and so generic
+type arguments, before it can compile. `core/` consistently uses the EXPERIMENTAL syntax proposal for ACCEPTED v0.1 feature directions. They have not passed a Koda compiler; none exists. Expected output is a future conformance target.
 
 | Example | What it demonstrates | Expected output once implemented |
 | --- | --- | --- |

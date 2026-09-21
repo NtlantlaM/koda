@@ -2,7 +2,10 @@
 
 > Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
 
-Status: planned; no tests or compiler are implemented in this repository.
+Status: the layout below is the plan. The `syntax/`, `types/`, `diagnostics/`
+and `execution/` directories now hold real fixtures for the subset that
+[compiler slice 0](../docs/implementation/slice-0.md) implements; the other
+directories, and most of the coverage listed here, remain future work.
 
 ```text
 tests/

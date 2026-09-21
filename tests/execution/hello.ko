@@ -1,0 +1,6 @@
+// Entry function and the one standard library import this slice resolves.
+import { print } from "koda:io"
+
+export fn main() -> Unit {
+    print("Hello, Koda!")
+}

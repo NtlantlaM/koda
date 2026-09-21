@@ -1,0 +1,21 @@
+# Roadmap Stage 1 exit: CI checks the TypeScript implementation.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - run: node --test "packages/*/dist/test/**/*.test.js"
+      # The compiled slice must still run a real program from a clean checkout.
+      - run: node packages/cli/dist/src/main.js run tests/execution/hello.ko

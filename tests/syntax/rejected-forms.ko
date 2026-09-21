@@ -1,0 +1,10 @@
+// Forms ADR 0011 rules out, and forms this slice does not implement.
+import { print } from "koda:io"
+
+export fn main() -> Unit {
+    let name = "Koda"
+    a = 1
+    b = 2
+    c = a < b < 3
+    print(name)
+}

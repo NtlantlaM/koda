@@ -44,6 +44,57 @@ Koda's initial surface is visually light while retaining explicit structural bra
 
 The parser needs precise newline/continuation and generic-call lookahead rules, and the formatter must canonicalize optional list separators/line layout.
 
+## Accepted follow-up details
+
+Approver for all of the following: repository owner/user, by explicit
+instruction. None supersedes anything above; each fills in a detail this
+decision delegated. All are recorded in
+[syntax](../spec/syntax.md#q01-follow-up-details-accepted).
+
+### 2026-09-20
+
+- **Literal interpolation braces are escaped with a backslash**, `\{` and
+  `\}`, alongside the existing `\n`, `\r`, `\t`, `\"` and `\\`.
+- **Parentheses end the adjacency required for direct negation.** ADR 0008's
+  minimum-Int exception applies only when a numeral is the immediate operand of
+  unary minus, so `-(9223372036854775808)` is rejected while
+  `-9223372036854775808` is valid. Negating an already typed minimum Int remains
+  an ordinary checked fault.
+
+Special Float values gain no literal spelling from this. ADR 0008 S07 keeps them
+as named values and APIs whose spelling is still deferred.
+
+### 2026-09-21
+
+- **An enum payload is declared with named fields and constructed
+  positionally.** The declaration names each value; construction supplies them
+  in declaration order.
+
+  ```koda
+  enum PaymentStatus {
+      Pending
+      Paid(transactionId: String)
+      Failed(reason: String)
+  }
+
+  status = PaymentStatus.Paid("tx-42")
+  ```
+
+  The declared name documents and identifies the field. It is not an argument
+  label: **named or labelled arguments are not introduced**, for this or for any
+  other call.
+
+- **A payload pattern binds fresh names.** A pattern binding need not match the
+  declared field name, so `PaymentStatus.Paid(id)` binds `id`. This fixes the
+  direction for match patterns; their remaining details stay with the work that
+  introduces `match`.
+
+This also settles how to read the pre-Q01 grammar sketch, which showed a
+positional payload declaration: that sketch was stale, and the named form above
+is authoritative.
+
+Everything else listed under Deferrals below remains deferred.
+
 ## Deferrals
 
 - Unicode identifiers and normalization/confusable policy

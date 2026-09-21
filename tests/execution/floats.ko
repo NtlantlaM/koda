@@ -1,0 +1,36 @@
+// ADR 0008: IEEE-754 binary64 with nearest/ties-to-even rounding, signed
+// infinity on overflow, signed zero, and NaN unequal to itself.
+import { print } from "koda:io"
+
+// Koda has no text form for Bool yet, so the program supplies its own.
+fn yesNo(flag: Bool) -> String {
+    if flag {
+        "yes"
+    } else {
+        "no"
+    }
+}
+
+fn over(value: Float) -> Float {
+    value * 10.0
+}
+
+export fn main() -> Unit {
+    print("sum {0.1 + 0.2}")
+    print("quotient {1.0 / 3.0}")
+    print("integral {4.0 / 2.0}")
+    print("negative zero {-0.0}")
+    print("overflow {over(1.7976931348623157e308)}")
+    print("infinity divide {1.0 / 0.0}")
+
+    nan = 0.0 / 0.0
+    print("nan text {nan}")
+    print("nan equals itself " + yesNo(nan == nan))
+    print("nan less than one " + yesNo(nan < 1.0))
+    print("nan not equal " + yesNo(nan != nan))
+    print("zeros equal " + yesNo(0.0 == -0.0))
+
+    // A literal may be retargeted to Float only when that is exact.
+    exact: Float = 2
+    print("retargeted {exact}")
+}

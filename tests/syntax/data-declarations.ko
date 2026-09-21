@@ -1,0 +1,86 @@
+// ADR 0011 layout for user-defined data: fields and record entries are
+// separated by a line break or by a comma, in multiline or compact form.
+import { print } from "koda:io"
+
+type Multiline {
+    first: String
+    second: Int
+}
+
+type Commas { first: String, second: Int }
+
+type TrailingSeparator {
+    first: String,
+    second: Int,
+}
+
+enum Bare {
+    One
+    Two
+}
+
+enum Compact { One, Two(why: String) }
+
+enum MultiPayload {
+    Both(left: Int, right: String)
+}
+
+fn use(value: Multiline) -> String {
+    value.first
+}
+
+// Match arms follow the same separator rule as fields and variants: a line
+// break, or a comma on one line.
+fn compactArms(value: Bare) -> String {
+    match value { Bare.One => "one", Bare.Two => "two" }
+}
+
+fn multilineArms(value: Compact) -> String {
+    match value {
+        Compact.One => "one"
+        Compact.Two(why) => why
+    }
+}
+
+fn trailingCommaArms(value: Bare) -> String {
+    match value {
+        Bare.One => "one",
+        Bare.Two => "two",
+    }
+}
+
+export fn main() -> Unit {
+    ready = true
+
+    // A record literal is suppressed in a control head, so this `{` opens the
+    // block rather than starting a construction.
+    if ready {
+        print("plain condition")
+    }
+
+    // Parentheses bring the literal form back, as ADR 0011 prescribes.
+    if (Commas { first: "a", second: 1 }).second == 1 {
+        print("parenthesised literal")
+    }
+
+    multiline = Multiline {
+        first: "x"
+        second: 2
+    }
+    print(use(multiline))
+
+    compact = Multiline { first: "y", second: 3 }
+    print(use(compact))
+
+    trailing = TrailingSeparator {
+        first: "z",
+        second: 4,
+    }
+    print(trailing.first)
+
+    // A payload is given in declaration order.
+    both = MultiPayload.Both(5, "six")
+    one = Compact.Two("because")
+    bare = Bare.One
+    print("declared and built")
+}

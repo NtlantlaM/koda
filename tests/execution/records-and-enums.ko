@@ -1,0 +1,76 @@
+// Slice 1A: user-defined data. Records are constructed with every field
+// exactly once and read with `.`; enum variants are qualified by their enum
+// and carry their declared payload (docs/spec/type-system.md, ADR 0007).
+import { print } from "koda:io"
+
+type User {
+    name: String
+    age: Int
+}
+
+// Nominal identity: same shape, different type (ADR 0007).
+type Visitor {
+    name: String
+    age: Int
+}
+
+type Order {
+    reference: String
+    total: Float
+    buyer: User
+}
+
+enum PaymentStatus {
+    Pending
+    Paid(transactionId: String)
+    Failed(reason: String)
+}
+
+fn describe(user: User) -> String {
+    "{user.name} is {user.age}"
+}
+
+fn buyerName(order: Order) -> String {
+    order.buyer.name
+}
+
+fn trace(label: String, value: Int) -> Int {
+    print("eval " + label)
+    value
+}
+
+export fn main() -> Unit {
+    user = User {
+        name: "Killo"
+        age: 30
+    }
+    print(user.name)
+    print(describe(user))
+
+    // A compact form with commas is the same construction.
+    visitor = Visitor { name: "Ntlantla", age: 41 }
+    print(describe(User { name: visitor.name, age: visitor.age }))
+
+    order = Order {
+        reference: "A-1"
+        total: 99.5
+        buyer: user
+    }
+    print("{buyerName(order)} owes {order.total} on {order.reference}")
+
+    // Rebinding a `mut` binding to a new value is how a record "changes".
+    mut current = user
+    current = User { name: "Killo", age: 31 }
+    print(describe(current))
+    print(describe(user))
+
+    waiting = PaymentStatus.Pending
+    paid = PaymentStatus.Paid("tx-42")
+    failed = PaymentStatus.Failed("card declined")
+    statuses = User { name: "built", age: 3 }
+    print("{statuses.name} {statuses.age} statuses")
+
+    // Fields are written in source order, so side effects keep that order.
+    ordered = User { age: trace("age", 1), name: "ordered" }
+    print("{ordered.name} {ordered.age}")
+}

@@ -1,0 +1,12 @@
+// ADR 0008: the signed minimum is a valid Int, but negating an already typed
+// minimum Int faults. The inner literal below is a direct negation and so is
+// valid; the outer negation acts on a typed Int value and overflows.
+import { print } from "koda:io"
+
+export fn main() -> Unit {
+    print("min {-9223372036854775808}")
+    print("min remainder {-9223372036854775808 % -1}")
+    print("negating it overflows next")
+    print("{-(-9223372036854775808)}")
+    print("never reached")
+}

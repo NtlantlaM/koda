@@ -2,7 +2,10 @@
 
 > Review decision state: **AWAITING DECISION** for all concrete choices not explicitly supplied by the user. This is a design baseline, not a frozen specification; recommendations and release deferrals are not approvals. See the ordered proposals in docs/design/open-questions.md (from the repository root).
 
-No compiler implementation is included in this repository. Stages are ordered by dependency, not calendar estimates. Each exit criterion must be met before advancing; scope changes require updated decisions.
+Stages are ordered by dependency, not calendar estimates. A first executable
+slice of Stages 1-4 exists; see [compiler slice 0](implementation/slice-0.md).
+It implements only constructs governed by already-accepted decisions, so it
+does not satisfy the Stage 0 exit criteria and does not resolve Q05-Q08. Each exit criterion must be met before advancing; scope changes require updated decisions.
 
 ## Stage 0 — Freeze the executable language subset
 

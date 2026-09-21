@@ -4,6 +4,8 @@
 
 The specifications define Koda independently of any compiler implementation. This is an initial design baseline, not a claim of a complete or implemented language.
 
+A specification is authoritative over the implementation, never the other way round. Where [compiler slice 0](implementation/slice-0.md) behaves in a way no accepted decision fixes, that is a provisional implementation choice recorded in its own document, and it does not settle the owning question.
+
 | Document | Responsibility |
 | --- | --- |
 | [Language](spec/language.md) | Principles, scope, evaluation model |
@@ -15,12 +17,15 @@ The specifications define Koda independently of any compiler implementation. Thi
 | [Project structure](spec/project-structure.md) | Modules, manifest, CLI and package policy |
 | [JavaScript/npm interoperability](spec/javascript-interop.md) | Foreign declarations and runtime boundaries |
 | [Compiler architecture](architecture/compiler.md) | TypeScript implementation and JavaScript backend |
-| [Toolchain layout](../packages/README.md) | Future package responsibilities |
-| [Conformance strategy](../tests/README.md) | Future acceptance tests |
+| [Toolchain layout](../packages/README.md) | Package responsibilities |
+| [Conformance strategy](../tests/README.md) | Acceptance tests and the planned coverage |
 | [Feature statuses](design/feature-status.md) | Canonical feature classification and delivery scope |
-| [Open questions](design/open-questions.md) | Q11 and Q02 ACCEPTED; eleven other proposals remain AWAITING DECISION |
+| [Open questions](design/open-questions.md) | Q01, Q02, Q03, Q04 and Q11 ACCEPTED; Q05–Q10 and Q12–Q13 remain AWAITING DECISION |
 | [Specification review](design/specification-review.md) | Complete baseline review, missing choices, relocation verification |
 | [ADRs](decisions/README.md) | Rationale and consequences |
+| [Compiler slice 0](implementation/slice-0.md) | The first executable slice, and the provisional choices it had to make |
+| [Compiler slice 1A](implementation/slice-1a.md) | User-defined data: types, records, field access, enums, variants, payloads |
+| [Compiler slice 1B](implementation/slice-1b.md) | Match and enum patterns: variant patterns, payload bindings, exhaustiveness |
 | [Roadmap](roadmap.md) | Stages, dependencies, and exit criteria |
 
 ## Reading status correctly
