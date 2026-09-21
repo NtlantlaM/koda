@@ -1,0 +1,157 @@
+// Slice 1C: nullable types, the null literal, nullable match, and refinement
+// by an explicit null check (ADR 0007 follow-up, docs/spec/type-system.md).
+import { print } from "koda:io"
+
+type Profile {
+    name: String
+    nickname: String?
+}
+
+type User {
+    handle: String
+}
+
+enum Mood {
+    Calm
+    Busy
+}
+
+// A nullable parameter, matched with a null arm and a binding arm.
+fn displayName(nickname: String?) -> String {
+    match nickname {
+        null => "Anonymous"
+        value => value
+    }
+}
+
+// `_` works as the catch-all too, when the value is not needed.
+fn hasNickname(nickname: String?) -> String {
+    match nickname {
+        null => "no"
+        _ => "yes"
+    }
+}
+
+// Refinement through `!=`, on an immutable parameter.
+fn greet(nickname: String?) -> String {
+    if nickname != null {
+        "Hi, {nickname}"
+    } else {
+        "Hi there"
+    }
+}
+
+// Refinement through the else branch of `==`.
+fn shout(nickname: String?) -> String {
+    if nickname == null {
+        "HEY"
+    } else {
+        "HEY {nickname}"
+    }
+}
+
+// A nested scope inherits an active refinement.
+fn nested(nickname: String?, loud: Bool) -> String {
+    if nickname != null {
+        if loud {
+            "{nickname}!"
+        } else {
+            "{nickname}"
+        }
+    } else {
+        "-"
+    }
+}
+
+// Left-to-right composition through `&&`.
+fn both(a: String?, b: String?) -> String {
+    if a != null && b != null {
+        "{a}+{b}"
+    } else {
+        "incomplete"
+    }
+}
+
+fn length(text: String) -> Int {
+    if text == "" {
+        0
+    } else {
+        1
+    }
+}
+
+// The right operand of `&&` is checked under the left operand's refinement.
+fn measured(text: String?) -> Int {
+    if text != null && length(text) == 1 {
+        1
+    } else {
+        0
+    }
+}
+
+// A nullable record, compared against null. This does not require equality
+// for User itself, which remains deferred.
+fn userState(user: User?) -> String {
+    if user == null {
+        "absent"
+    } else {
+        "present as {user.handle}"
+    }
+}
+
+// A nullable enum: handle absence first, then match the value.
+fn moodName(mood: Mood?) -> String {
+    match mood {
+        null => "unknown"
+        value =>
+            match value {
+                Mood.Calm => "calm"
+                Mood.Busy => "busy"
+            }
+    }
+}
+
+// An immutable local refines exactly as a parameter does.
+fn viaLocal(profile: Profile) -> String {
+    nickname = profile.nickname
+    if nickname != null {
+        nickname
+    } else {
+        profile.name
+    }
+}
+
+export fn main() -> Unit {
+    ada = Profile { name: "Ada", nickname: null }
+    kay = Profile { name: "Kay", nickname: "K" }
+
+    print(displayName(ada.nickname))
+    print(displayName(kay.nickname))
+    print(hasNickname(ada.nickname) + " " + hasNickname(kay.nickname))
+
+    print(greet(ada.nickname))
+    print(greet(kay.nickname))
+    print(shout(ada.nickname))
+    print(shout(kay.nickname))
+
+    print(nested(kay.nickname, true))
+    print(nested(kay.nickname, false))
+    print(nested(ada.nickname, true))
+
+    print(both(kay.nickname, kay.nickname))
+    print(both(ada.nickname, kay.nickname))
+    print("measured {measured(kay.nickname)} {measured(ada.nickname)}")
+
+    print(userState(null))
+    print(userState(User { handle: "kay" }))
+
+    print(moodName(null))
+    print(moodName(Mood.Calm))
+    print(moodName(Mood.Busy))
+
+    print(viaLocal(ada))
+    print(viaLocal(kay))
+
+    // A non-nullable value is accepted where a nullable one is expected.
+    print(displayName("direct"))
+}

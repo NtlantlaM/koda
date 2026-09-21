@@ -26,6 +26,10 @@ A specification is authoritative over the implementation, never the other way ro
 | [Compiler slice 0](implementation/slice-0.md) | The first executable slice, and the provisional choices it had to make |
 | [Compiler slice 1A](implementation/slice-1a.md) | User-defined data: types, records, field access, enums, variants, payloads |
 | [Compiler slice 1B](implementation/slice-1b.md) | Match and enum patterns: variant patterns, payload bindings, exhaustiveness |
+| [Compiler slice 1C](implementation/slice-1c.md) | Nullability: `T?`, `null`, nullable match, null-check refinement |
+| [Compiler slice 2A](implementation/slice-2a.md) | Generic data declarations, concrete type applications and substitution; no Result or generic functions |
+| [Compiler slice 2B](implementation/slice-2b.md) | Result values and matching: prelude Result, Ok/Err, contextual construction |
+| [Compiler slice 2C](implementation/slice-2c.md) | Result must-handle analysis: discard, outstanding obligations, transfer, overwrite |
 | [Roadmap](roadmap.md) | Stages, dependencies, and exit criteria |
 
 ## Reading status correctly

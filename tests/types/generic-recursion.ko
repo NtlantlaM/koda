@@ -1,0 +1,9 @@
+// ADR 0007 Slice 2A: reject declaration cycles, even with changed arguments.
+type Box<T> { value: T }
+type Node<T> { next: Node<T>? }
+type Growing<T> { next: Growing<Box<T>>? }
+type Left<T> { right: Right<T>? }
+type Right<T> { left: Left<Box<T>>? }
+enum Chain<T> { End, Next(value: Chain<T>) }
+type ThroughArgument { value: Box<ThroughArgument>? }
+type NullableNode { next: NullableNode? }

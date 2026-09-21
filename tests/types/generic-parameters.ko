@@ -1,0 +1,8 @@
+// ADR 0007 Slice 2A: duplicate/reserved parameters; declaration-local scope.
+type Duplicate<T, T> { value: T }
+type Primitive<Int> { value: Int }
+enum Reserved<Result> { Value(value: Result) }
+type DecimalCollision<Decimal> { value: Decimal }
+type Unknown<T> { value: U }
+type Outside { value: T }
+fn outside(value: T) -> Unit {}

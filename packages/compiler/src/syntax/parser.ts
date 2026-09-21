@@ -41,6 +41,7 @@ import type {
   StringLiteralPart,
   TypeDecl,
   TypeRef,
+  TypeParameterDecl,
   VariantDecl,
 } from "./ast.js";
 
@@ -355,20 +356,36 @@ export class Parser {
     return { name: nameToken.text, nameSpan: nameToken.span, type, span: joinSpans(nameToken.span, type.span) };
   }
 
-  /** Rejects type parameters uniformly; generics are outside this slice. */
-  private rejectTypeParameters(what: string): boolean {
-    if (!this.isPunct("<")) return false;
-    this.unsupported(
-      `generic ${what} are not available in this compiler slice`,
-      this.current.span,
-      "type parameters are not supported yet",
-      [
-        "small invariant generics are accepted for v0.1 by ADR 0007, but this slice does not implement them",
-        "see docs/implementation/slice-1a.md for the supported subset",
-      ],
-    );
-    this.skipDeclaration();
-    return true;
+  /** Only unconstrained parameters on data declarations belong to Slice 2A. */
+  private parseTypeParameters(): TypeParameterDecl[] | null {
+    if (!this.isPunct("<")) return [];
+    this.advance();
+    this.skipNewlines();
+    const parameters: TypeParameterDecl[] = [];
+    if (this.isPunct(">")) {
+      this.error("a generic declaration needs at least one type parameter", this.current.span, "empty type parameter list");
+      this.advance();
+      return parameters;
+    }
+    while (!this.atEnd) {
+      if (this.current.kind !== "identifier") {
+        this.error("expected a type parameter name", this.current.span, "type parameters are comma-separated names");
+        return null;
+      }
+      const name = this.advance();
+      parameters.push({ name: name.text, span: name.span });
+      this.skipNewlines();
+      if (this.isPunct(":") || this.isPunct("=")) {
+        this.unsupported("generic bounds and defaults are not available", this.current.span, "only unconstrained type parameters are supported", ["see docs/implementation/slice-2a.md"]);
+        return null;
+      }
+      if (!this.isPunct(",")) break;
+      this.advance();
+      this.skipNewlines();
+      if (this.isPunct(">")) break;
+    }
+    if (!this.expectPunct(">", "to close the type parameter list")) return null;
+    return parameters;
   }
 
   private parseTypeDecl(exported: boolean, start: Span): TypeDecl | null {
@@ -379,7 +396,8 @@ export class Parser {
       return null;
     }
     const nameToken = this.advance();
-    if (this.rejectTypeParameters("type declarations")) return null;
+    const typeParameters = this.parseTypeParameters();
+    if (!typeParameters) { this.skipDeclaration(); return null; }
 
     const end = this.current.span;
     const fields = this.parseBracedList("the fields of this type", () => this.parseFieldDecl());
@@ -390,6 +408,7 @@ export class Parser {
       exported,
       name: nameToken.text,
       nameSpan: nameToken.span,
+      typeParameters,
       fields,
       span: joinSpans(start, this.tokens[this.position - 1]?.span ?? end),
     };
@@ -457,7 +476,8 @@ export class Parser {
       return null;
     }
     const nameToken = this.advance();
-    if (this.rejectTypeParameters("enum declarations")) return null;
+    const typeParameters = this.parseTypeParameters();
+    if (!typeParameters) { this.skipDeclaration(); return null; }
 
     const end = this.current.span;
     const variants = this.parseBracedList("the variants of this enum", () => this.parseVariantDecl());
@@ -468,6 +488,7 @@ export class Parser {
       exported,
       name: nameToken.text,
       nameSpan: nameToken.span,
+      typeParameters,
       variants,
       span: joinSpans(start, this.tokens[this.position - 1]?.span ?? end),
     };
@@ -486,11 +507,11 @@ export class Parser {
 
     if (this.isPunct("<")) {
       this.unsupported(
-        "generic declarations are not available in this compiler slice",
+        "generic function declarations are not available in this compiler slice",
         this.current.span,
         "type parameters are not supported yet",
         [
-          "small invariant generics are accepted for v0.1 by ADR 0007, but this slice implements primitives only",
+          "Slice 2A implements generic data declarations, not generic functions",
           "see docs/implementation/slice-0.md for the supported subset",
         ],
       );
@@ -568,25 +589,40 @@ export class Parser {
       return null;
     }
     const token = this.advance();
+    let argumentsList: TypeRef[] | null = null;
+    let end = token.span;
     if (this.isPunct("<")) {
-      this.unsupported(
-        "generic type arguments are not available in this compiler slice",
-        this.current.span,
-        "type arguments are not supported yet",
-        ["see docs/implementation/slice-0.md for the supported subset"],
-      );
-      return null;
+      this.advance();
+      this.skipNewlines();
+      argumentsList = [];
+      while (!this.isPunct(">") && !this.atEnd) {
+        const argument = this.parseTypeRef();
+        if (!argument) return null;
+        argumentsList.push(argument);
+        this.skipNewlines();
+        if (!this.isPunct(",")) break;
+        this.advance();
+        this.skipNewlines();
+      }
+      const close = this.expectPunct(">", "to close the type arguments");
+      if (!close) return null;
+      end = close.span;
     }
     if (this.isPunct("?")) {
-      const span = joinSpans(token.span, this.current.span);
-      this.advance();
-      this.unsupported("nullable types are not available in this compiler slice", span, "'?' is not supported yet", [
-        "`T?` is an accepted v0.1 feature (ADR 0007), but using it safely needs `match`, which this slice does not implement",
-        "see docs/implementation/slice-0.md for the supported subset",
-      ]);
-      return null;
+      const question = this.advance();
+      // ADR 0007 rejects a written `T??`; there is only one absence layer.
+      if (this.isPunct("?")) {
+        const extra = this.advance();
+        this.error(
+          `'${token.text}??' is not a type`,
+          joinSpans(question.span, extra.span),
+          "a value is either absent or present, never absent twice",
+          [`write '${token.text}?' for a value that may be absent`],
+        );
+      }
+      return { name: token.text, arguments: argumentsList, nullable: true, span: joinSpans(token.span, question.span) };
     }
-    return { name: token.text, span: token.span };
+    return { name: token.text, arguments: argumentsList, nullable: false, span: joinSpans(token.span, end) };
   }
 
   // -------------------------------------------------------------- statements
@@ -825,6 +861,31 @@ export class Parser {
   private parsePostfix(): Expression {
     let expression = this.parsePrimary();
     for (;;) {
+      const genericEnd = this.unsupportedGenericSuffixEnd();
+      if ((expression.kind === "name" || expression.kind === "member") && genericEnd !== null) {
+        this.unsupported(
+          "generic calls and generic value construction are not available in Slice 2A",
+          joinSpans(expression.span, this.tokens[genericEnd]!.span),
+          "type arguments are supported in type positions only",
+          ["this form is not interpreted as chained comparisons; generic functions, calls and construction remain outside this slice"],
+        );
+        this.position = genericEnd + 1;
+        if (this.isPunct(".")) {
+          this.advance();
+          if (this.current.kind === "identifier") this.advance();
+        }
+        if (this.isPunct("(")) this.skipCallArguments();
+        else if (this.isPunct("{")) {
+          let depth = 0;
+          do {
+            if (this.isPunct("{")) depth += 1;
+            if (this.isPunct("}")) depth -= 1;
+            this.advance();
+          } while (!this.atEnd && depth > 0);
+        }
+        expression = { kind: "error", span: expression.span };
+        continue;
+      }
       if (this.isPunct("(")) {
         if (expression.kind !== "name" && expression.kind !== "member") {
           this.error("this is not something that can be called", expression.span, "expected a name here", [
@@ -858,6 +919,26 @@ export class Parser {
       }
       return expression;
     }
+  }
+
+  /** Recognition for a targeted rejection only; it creates no generic-call AST. */
+  private unsupportedGenericSuffixEnd(): number | null {
+    if (!this.isPunct("<")) return null;
+    let depth = 0;
+    for (let index = this.position; index < this.tokens.length; index += 1) {
+      const token = this.tokens[index]!;
+      if (token.text === "<") depth += 1;
+      else if (token.text === ">") {
+        depth -= 1;
+        if (depth === 0) {
+          const next = this.tokens[index + 1]?.text;
+          return next === "(" || next === "{" || next === "." ? index : null;
+        }
+      } else if (token.kind !== "identifier" && token.kind !== "newline" && token.text !== "," && token.text !== "?") {
+        return null;
+      }
+    }
+    return null;
   }
 
   private skipCallArguments(): void {
@@ -995,12 +1076,8 @@ export class Parser {
       return { kind: "error", span: token.span };
     }
     if (this.isKeyword("null")) {
-      this.unsupported("null is not available in this compiler slice", token.span, "'null' is not supported yet", [
-        "nullable values are an accepted v0.1 feature (ADR 0007), but using them safely needs `match`",
-        "see docs/implementation/slice-0.md for the supported subset",
-      ]);
       this.advance();
-      return { kind: "error", span: token.span };
+      return { kind: "null", span: token.span };
     }
 
     this.error("expected an expression", token.span, `found ${this.describe(token)}`);
@@ -1047,8 +1124,13 @@ export class Parser {
    * Nested destructuring is not part of this slice, so a payload entry is a
    * name or `_` and nothing deeper.
    */
-  private parsePattern(insidePayload: boolean): Pattern {
+  private parsePattern(): Pattern {
     const token = this.current;
+
+    if (this.isKeyword("null")) {
+      this.advance();
+      return { kind: "null-pattern", span: token.span };
+    }
 
     if (token.kind !== "identifier") {
       this.error("expected a pattern", token.span, `found ${this.describe(token)}`, [
@@ -1068,22 +1150,9 @@ export class Parser {
       }
       const variantToken = this.advance();
 
-      let payload: Pattern[] | null = null;
-      let end = variantToken.span;
-      if (this.isPunct("(")) {
-        this.advance();
-        payload = [];
-        while (!this.isPunct(")") && !this.atEnd) {
-          payload.push(this.parsePattern(true));
-          if (this.isPunct(",")) {
-            this.advance();
-            continue;
-          }
-          break;
-        }
-        const close = this.expectPunct(")", "to close the payload pattern");
-        end = close?.span ?? variantToken.span;
-      }
+      const qualified = this.parsePayloadPatterns(variantToken.span);
+      const payload = qualified.patterns;
+      const end = qualified.end;
 
       return {
         kind: "variant-pattern",
@@ -1099,25 +1168,48 @@ export class Parser {
     this.advance();
     if (token.text === "_") return { kind: "wildcard", span: token.span };
 
-    if (insidePayload) return { kind: "binding", name: token.text, span: token.span };
+    // `Ok(value)`: an unqualified variant pattern. A binding pattern is never
+    // followed by '(', so this is unambiguous. Only the prelude Result
+    // constructors use the form; the checker rejects it for user enums, which
+    // stay qualified.
+    if (this.isPunct("(")) {
+      const unqualified = this.parsePayloadPatterns(token.span);
+      return {
+        kind: "variant-pattern",
+        enumName: null,
+        enumSpan: token.span,
+        variantName: token.text,
+        variantSpan: token.span,
+        payload: unqualified.patterns,
+        span: joinSpans(token.span, unqualified.end),
+      };
+    }
 
-    // A bare name standing as a whole arm would be a binding catch-all. ADR
-    // 0011 accepts that form, but this slice implements only `_`.
-    this.unsupported(
-      "a bare name is not available as a whole pattern in this compiler slice",
-      token.span,
-      "this would bind every remaining value",
-      [
-        "`_` matches anything without binding it",
-        "a qualified variant such as `Status.Paid(id)` matches one case",
-        "see docs/implementation/slice-1b.md for the supported subset",
-      ],
-    );
-    return { kind: "pattern-error", span: token.span };
+    // A bare name binds. Slice 1C introduces the form only for matching a
+    // nullable value, so the checker rejects it for other scrutinees rather
+    // than generalising it silently.
+    return { kind: "binding", name: token.text, span: token.span };
+  }
+
+  /** The `(...)` of a variant pattern, shared by both spellings. */
+  private parsePayloadPatterns(fallback: Span): { patterns: Pattern[] | null; end: Span } {
+    if (!this.isPunct("(")) return { patterns: null, end: fallback };
+    this.advance();
+    const patterns: Pattern[] = [];
+    while (!this.isPunct(")") && !this.atEnd) {
+      patterns.push(this.parsePattern());
+      if (this.isPunct(",")) {
+        this.advance();
+        continue;
+      }
+      break;
+    }
+    const close = this.expectPunct(")", "to close the payload pattern");
+    return { patterns, end: close?.span ?? fallback };
   }
 
   private parseMatchArm(): MatchArm | null {
-    const pattern = this.parsePattern(false);
+    const pattern = this.parsePattern();
     if (!this.isPunct("=>")) {
       this.error("expected '=>' after the pattern", this.current.span, `found ${this.describe(this.current)}`, [
         "an arm is written `pattern => result`",

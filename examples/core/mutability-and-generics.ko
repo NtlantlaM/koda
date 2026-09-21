@@ -1,4 +1,4 @@
-// Decision state: AWAITING DECISION; illustrative baseline, not approved syntax.
+// Generic function spelling is accepted; inference remains unspecified and outside Slice 2A.
 import { print } from "koda:io"
 
 fn identity<T>(value: T) -> T {
@@ -6,7 +6,7 @@ fn identity<T>(value: T) -> T {
 }
 
 export fn main() -> Unit {
-    let label = identity("ready")
+    label = identity("ready")
     mut count = 0
     count = count + 1
     print(label)

@@ -1,7 +1,7 @@
 # Feature status register
 
 Maturity and decision state describe the language, not the implementation. A
-first executable compiler slice exists ([slice 0](../implementation/slice-0.md));
+compiler implementation now reaches [Slice 2A](../implementation/slice-2a.md);
 a feature being implemented there does not change its row, and a row being
 ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md), [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md), and [Q03 / ADR 0009](../decisions/0009-q03-mutation-and-aliasing.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
 
@@ -18,13 +18,24 @@ ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principl
 | Explicit function parameter/return types; inferred locals and call results | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Immutable bindings by default; `mut` permits rebinding ordinary values | ACCEPTED | v0.1; Q03 / ADR 0009 | ACCEPTED |
 | Nullable `T?`; reject written `T??`; flatten nullable generic substitution | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
-| Null refinement via match and explicit checks on stable immutable locals | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
+| Null refinement via match and explicit `x != null` / `x == null` checks on immutable locals and parameters; lexical lifetime; left-to-right `&&` composition | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
+| Nullable compared with `null` as an absence test, not derived equality | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
+| Early-return narrowing; refinement via `||`, negation, or an intermediate Bool | LATER | Explicit ADR 0007 deferrals | ACCEPTED deferral |
 | Alias-aware mutable smart casts | LATER | Not provided in v0.1; Q11 | ACCEPTED deferral |
-| Explicit `Result<T, E>` for recoverable failure | ACCEPTED | v0.1; no implicit error propagation | AWAITING DECISION |
+| Explicit `Result<T, E>` for recoverable failure | ACCEPTED | ADR 0010; values, construction and matching implemented in Slice 2B | ACCEPTED |
+| Prelude payload names `Ok(value: T)` / `Err(error: E)`; unqualified positional constructors | ACCEPTED | ADR 0010 follow-up, 2026-09-21 | ACCEPTED |
+| Contextual Result construction, including through one outer nullable wrapper | ACCEPTED | Slice 2B; no general inference | ACCEPTED |
+| Result must-handle obligation enforcement | ACCEPTED | ADR 0010; implemented in Slice 2C for bindings whose own type is Result | ACCEPTED |
+| Match discharge requires visible `Ok` and `Err` arms; wildcards do not discharge | ACCEPTED | ADR 0010 follow-up, 2026-09-21 | ACCEPTED |
+| Result parameters begin outstanding; binding transfers; overwrite rejected | ACCEPTED | ADR 0010 follow-up, 2026-09-21 | ACCEPTED |
+| Must-handle tracking through record fields and enum payloads | LATER | Known Slice 2C limitation, not a permitted discard | AWAITING DECISION |
 | Exhaustive pattern matching; associated-data enums | ACCEPTED | v0.1 | AWAITING DECISION |
 | Nominal identity for Koda-defined types | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Functions, lexical scopes, modules, explicit exports | EXPERIMENTAL | v0.1 | AWAITING DECISION |
 | Small invariant user-defined generics | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
+| Generic record/enum declarations and concrete type applications | ACCEPTED | Slice 2A; declaration-local parameters, exact arity, substitution, nullable flattening, conservative recursion rejection | ACCEPTED |
+| Generic function/call syntax | ACCEPTED | Not implemented in Slice 2A | ACCEPTED spelling under Q01; not a complete inference contract |
+| Generic construction and generic-call inference details | EXPERIMENTAL | Outside Slice 2A; no temporary spelling or inference rule | AWAITING DECISION |
 | Variance and advanced generic constraints | LATER | Deferred by Q11 | ACCEPTED deferral |
 | Checked signed-64-bit Int; binary64 Float; same semantics on every backend/build mode | ACCEPTED | v0.1; [Q02 semantics](../spec/numbers.md) | ACCEPTED |
 | Exact contextual literal typing; explicit typed numeric conversions and same-type comparisons | ACCEPTED | v0.1; Q02; spelling remains Q01 | ACCEPTED |
@@ -39,12 +50,12 @@ ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principl
 | Entity identity/equality | LATER | Deferred by Q11; persistence semantics remain Q09 | ACCEPTED deferral; Q09 AWAITING DECISION |
 | Unicode scalar-value strings; exact non-normalizing equality | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
 | Reject invalid/lone surrogates at foreign boundaries | ACCEPTED | Q11; error/adapter contract remains Q06 | ACCEPTED requirement |
-| String interpolation and multiline strings | ACCEPTED | Supported; spelling/layout/conversion details remain open | ACCEPTED features; Q01 AWAITING DECISION |
+| String interpolation and multiline strings | ACCEPTED | ADR 0011 surface accepted; remaining layout/conversion details separate | ACCEPTED |
 | Direct string indexing and length semantics | LATER | Deferred by Q11 | ACCEPTED deferral |
 | Reject local/parameter shadowing and same-scope duplicates | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
 | Ordinary function recursion | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
 | Recursive user-defined data types | LATER | Deferred by Q11 | ACCEPTED deferral |
-| Concrete syntax and operator precedence in syntax spec | EXPERIMENTAL | Freeze in Q01 before parser work | AWAITING DECISION |
+| Concrete syntax and operator precedence in syntax spec | ACCEPTED | ADR 0011 and its follow-ups; implementation is staged | ACCEPTED |
 | Traits and composition over inheritance | ACCEPTED | Direction; trait syntax/implementation LATER | AWAITING DECISION |
 | Entity distinct from ordinary application data | ACCEPTED | Direction; ADR 0003 | AWAITING DECISION |
 | Entity schema, queries, transactions, adapter APIs | EXPERIMENTAL | Not in v0.1; design sketches only | AWAITING DECISION |

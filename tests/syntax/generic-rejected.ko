@@ -1,0 +1,16 @@
+// Invalid parameter syntax and excluded generic function/call/construction forms.
+type Empty<> { value: Int }
+type Bounded<T: Int> { value: T }
+type Defaulted<T = Int> { value: T }
+type NoComma<A B> { value: A }
+type DoubleNullable<T> { value: T?? }
+fn generic<T>(value: T) -> T { value }
+fn call() -> Unit { parse<Int>("42") }
+fn record() -> Unit { value = Box<Int> { value: 1 } }
+fn enumeration() -> Unit { value = Choice<Int>.Value(1) }
+fn multilineCall() -> Unit {
+    parse<
+        Int
+    >("42")
+}
+fn nullableApplication(value: DoubleNullable<Int>??) -> Unit {}

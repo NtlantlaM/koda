@@ -1,5 +1,5 @@
 /**
- * Syntax tree for the slice-0 subset.
+ * Syntax tree through Slice 2A.
  *
  * Every node carries its origin span. Numerals keep their exact source text so
  * ADR 0008's contextual literal typing can run in the checker rather than the
@@ -8,6 +8,15 @@
 import type { Span } from "../source/source.js";
 
 export interface TypeRef {
+  readonly name: string;
+  /** null means no angle brackets; [] preserves an explicitly empty application. */
+  readonly arguments: readonly TypeRef[] | null;
+  /** True when the reference carried a `?` suffix (ADR 0011 follow-up). */
+  readonly nullable: boolean;
+  readonly span: Span;
+}
+
+export interface TypeParameterDecl {
   readonly name: string;
   readonly span: Span;
 }
@@ -50,6 +59,7 @@ export interface TypeDecl {
   readonly exported: boolean;
   readonly name: string;
   readonly nameSpan: Span;
+  readonly typeParameters: readonly TypeParameterDecl[];
   readonly fields: readonly FieldDecl[];
   readonly span: Span;
 }
@@ -72,6 +82,7 @@ export interface EnumDecl {
   readonly exported: boolean;
   readonly name: string;
   readonly nameSpan: Span;
+  readonly typeParameters: readonly TypeParameterDecl[];
   readonly variants: readonly VariantDecl[];
   readonly span: Span;
 }
@@ -148,6 +159,18 @@ export interface StringLiteral {
 export interface BoolLiteral {
   readonly kind: "bool";
   readonly value: boolean;
+  readonly span: Span;
+}
+
+/**
+ * The absent value.
+ *
+ * It has no type of its own: the expected type supplies one, and an
+ * unconstrained `null` is rejected because inference must not invent an unsafe
+ * type (docs/spec/type-system.md).
+ */
+export interface NullLiteral {
+  readonly kind: "null";
   readonly span: Span;
 }
 
@@ -261,6 +284,12 @@ export interface ParenExpression {
   readonly span: Span;
 }
 
+/** `null`: matches the absent value of a nullable scrutinee. */
+export interface NullPattern {
+  readonly kind: "null-pattern";
+  readonly span: Span;
+}
+
 /** `_`: matches anything and binds nothing. */
 export interface WildcardPattern {
   readonly kind: "wildcard";
@@ -288,7 +317,12 @@ export interface BindingPattern {
  */
 export interface VariantPattern {
   readonly kind: "variant-pattern";
-  readonly enumName: string;
+  /**
+   * null for the unqualified prelude form, `Ok(value)`. Ordinary user enum
+   * variants stay qualified, so the checker rejects an unqualified pattern for
+   * anything but Result.
+   */
+  readonly enumName: string | null;
   readonly enumSpan: Span;
   readonly variantName: string;
   readonly variantSpan: Span;
@@ -302,7 +336,7 @@ export interface ErrorPattern {
   readonly span: Span;
 }
 
-export type Pattern = WildcardPattern | BindingPattern | VariantPattern | ErrorPattern;
+export type Pattern = WildcardPattern | BindingPattern | VariantPattern | NullPattern | ErrorPattern;
 
 export interface MatchArm {
   readonly pattern: Pattern;
@@ -335,6 +369,7 @@ export type Expression =
   | NumberLiteral
   | StringLiteral
   | BoolLiteral
+  | NullLiteral
   | NameExpression
   | CallExpression
   | UnaryExpression

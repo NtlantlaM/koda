@@ -93,6 +93,24 @@ export interface IRBoolConst extends IRNode {
   readonly value: boolean;
 }
 
+/** The absent value. Its type comes from the context that accepted it. */
+export interface IRNullConst extends IRNode {
+  readonly kind: "null";
+}
+
+/**
+ * `x != null` / `x == null`.
+ *
+ * An absence test, not ordinary equality: ADR 0007 keeps this separate so that
+ * comparing a `User?` with null never implies `User == User`.
+ */
+export interface IRNullTest extends IRNode {
+  readonly kind: "null-test";
+  readonly operand: IRExpression;
+  /** true for `!=`, false for `==`. */
+  readonly negated: boolean;
+}
+
 export interface IRLocalRef extends IRNode {
   readonly kind: "local";
   readonly symbol: LocalSymbol;
@@ -237,6 +255,28 @@ export interface IRMatch extends IRNode {
   readonly arms: readonly IRMatchArm[];
 }
 
+/** One arm of a nullable match: the `null` case, or the catch-all binding. */
+export interface IRNullableArm {
+  readonly test: "null" | "catch-all";
+  /** The bound non-null local, or null for `_` and for the `null` arm. */
+  readonly binding: LocalSymbol | null;
+  readonly body: IRBlock;
+  readonly span: Span;
+}
+
+/**
+ * `match x { null => ..., value => ... }`.
+ *
+ * Slice 1C restricts a nullable match to a `null` arm and a catch-all, so the
+ * scrutinee needs only one test. It is still bound to a temporary first, so a
+ * side-effecting scrutinee runs exactly once.
+ */
+export interface IRNullableMatch extends IRNode {
+  readonly kind: "nullable-match";
+  readonly scrutinee: IRExpression;
+  readonly arms: readonly IRNullableArm[];
+}
+
 export type IRInterpolationPart =
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "value"; readonly value: IRExpression };
@@ -267,7 +307,10 @@ export type IRExpression =
   | IRRecordConstruct
   | IRFieldAccess
   | IRVariantConstruct
-  | IRMatch;
+  | IRMatch
+  | IRNullConst
+  | IRNullTest
+  | IRNullableMatch;
 
 export interface IRFunction {
   readonly symbol: FunctionSymbol;
@@ -279,4 +322,9 @@ export interface IRModule {
   readonly functions: readonly IRFunction[];
   /** The exported `main` entry, when the module declares one. */
   readonly entry: FunctionSymbol | null;
+  /**
+   * Declaration id of the prelude `Result`, so the obligation pass can
+   * recognise it without re-deriving the prelude.
+   */
+  readonly resultDeclarationId: number | null;
 }

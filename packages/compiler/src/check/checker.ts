@@ -1,5 +1,5 @@
 /**
- * Resolution and type checking for the slice-0 subset.
+ * Resolution and type checking through Slice 2A.
  *
  * Accepted rules enforced here:
  *   - ADR 0007: explicit parameter and return types, inferred locals and call
@@ -21,7 +21,7 @@
  */
 import { Codes } from "../diagnostics/codes.js";
 import type { DiagnosticBag } from "../diagnostics/diagnostic.js";
-import type { Span } from "../source/source.js";
+import { spanFrom, type Span } from "../source/source.js";
 import {
   INT_MAX,
   INT_MIN,
@@ -43,7 +43,9 @@ import type {
   Statement,
   TypeDecl,
   TypeRef,
+  TypeParameterDecl,
 } from "../syntax/ast.js";
+import type { IRNullableArm } from "../ir/ir.js";
 import type {
   FunctionSymbol,
   IRBlock,
@@ -66,10 +68,14 @@ import {
   StringType,
   UnitType,
   enumType,
+  instantiatedField,
   hasEquality,
   isAssignable,
+  isNullable,
   isNumeric,
+  nullableType,
   recordType,
+  withoutNull,
   typeName,
   unify,
   type EnumDeclaration,
@@ -77,6 +83,7 @@ import {
   type KType,
   type RecordDeclaration,
   type VariantSymbol,
+  type TypeParameterSymbol,
 } from "./types.js";
 
 /**
@@ -94,16 +101,43 @@ const IO_MODULE = "koda:io";
  * unsupported diagnostic rather than an "unknown name".
  */
 const RESERVED_PRELUDE_NAMES: ReadonlyMap<string, string> = new Map([
-  ["Result", "`Result` needs enums and generics, which this compiler slice does not implement"],
-  ["Ok", "`Ok` needs `Result`, which this compiler slice does not implement"],
-  ["Err", "`Err` needs `Result`, which this compiler slice does not implement"],
   ["Decimal", "`Decimal` is reserved by ADR 0008 and has no usable v0.1 semantics"],
 ]);
+
+/**
+ * Prelude names that resolve to real behaviour but stay closed to user
+ * declarations and bindings, so `Result`, `Ok` and `Err` always mean one thing.
+ */
+const PRELUDE_NAMES: ReadonlySet<string> = new Set(["Result", "Ok", "Err"]);
+
+const RESULT_TYPE_NAME = "Result";
+const RESULT_OK = "Ok";
+const RESULT_ERR = "Err";
 
 const INTERPOLATABLE = new Set(["String", "Int", "Float"]);
 
 interface Scope {
   readonly bindings: Map<string, LocalSymbol>;
+  /**
+   * Active null refinements, keyed by symbol id.
+   *
+   * Refinement is lexical (ADR 0007 follow-up): a nested scope inherits what
+   * the enclosing ones established, and popping a scope at an ordinary join
+   * restores the declared nullable type.
+   */
+  readonly refinements: Map<number, KType>;
+}
+
+/** What a condition proves about its operands in each branch. */
+interface Refinement {
+  readonly symbol: LocalSymbol;
+  readonly type: KType;
+}
+
+interface CheckedCondition {
+  readonly ir: IRExpression;
+  readonly whenTrue: readonly Refinement[];
+  readonly whenFalse: readonly Refinement[];
 }
 
 interface BlockResult {
@@ -130,6 +164,7 @@ export class Checker {
    * invalidating any program that compiles today.
    */
   private readonly moduleNames = new Map<string, { what: string; span: Span }>();
+  private resultDeclaration: EnumDeclaration | null = null;
   private nextDeclarationId = 0;
 
   constructor(path: string, diagnostics: DiagnosticBag) {
@@ -140,6 +175,7 @@ export class Checker {
   // ------------------------------------------------------------------ module
 
   check(module: Module): IRModule {
+    this.declarePreludeResult();
     this.checkImports(module);
 
     // Declarations are mutually visible regardless of order, so names are
@@ -158,7 +194,64 @@ export class Checker {
       functions.push(this.checkFunction(declaration, symbol));
     }
 
-    return { path: this.path, functions, entry: this.resolveEntry(module) };
+    return {
+      path: this.path,
+      functions,
+      entry: this.resolveEntry(module),
+      resultDeclarationId: this.resultDeclaration?.id ?? null,
+    };
+  }
+
+  /**
+   * Builds the prelude `Result<T, E>` as an ordinary generic enum.
+   *
+   * ADR 0010's follow-up fixes the payload names as `value` and `error`. Using
+   * the same EnumDeclaration shape a user declaration produces means every
+   * later stage - application, substitution, patterns, exhaustiveness, IR and
+   * lowering - treats Result as the ordinary enum it is, with no special case.
+   */
+  private declarePreludeResult(): void {
+    const id = this.nextDeclarationId++;
+    const span = spanFrom(this.path, 0, 0);
+    const typeParameters: TypeParameterSymbol[] = [
+      { ownerId: id, index: 0, name: "T", declarationSpan: span },
+      { ownerId: id, index: 1, name: "E", declarationSpan: span },
+    ];
+    const parameterType = (index: number): KType => ({ kind: "TypeParameter", parameter: typeParameters[index]! });
+
+    const ok: VariantSymbol = {
+      name: RESULT_OK,
+      declarationSpan: span,
+      index: 0,
+      payload: [{ name: "value", type: parameterType(0), declarationSpan: span, index: 0 }],
+    };
+    const err: VariantSymbol = {
+      name: RESULT_ERR,
+      declarationSpan: span,
+      index: 1,
+      payload: [{ name: "error", type: parameterType(1), declarationSpan: span, index: 0 }],
+    };
+
+    const declaration: EnumDeclaration = {
+      id,
+      name: RESULT_TYPE_NAME,
+      nameSpan: span,
+      exported: true,
+      typeParameters,
+      variants: [ok, err],
+      variantsByName: new Map([
+        [RESULT_OK, ok],
+        [RESULT_ERR, err],
+      ]),
+    };
+
+    this.resultDeclaration = declaration;
+    this.enums.set(RESULT_TYPE_NAME, declaration);
+  }
+
+  /** True for the prelude Result, whatever arguments it carries. */
+  private isResult(type: KType): type is Extract<KType, { kind: "Enum" }> {
+    return type.kind === "Enum" && type.declaration.id === this.resultDeclaration?.id;
   }
 
   /**
@@ -166,7 +259,7 @@ export class Checker {
    * which case a diagnostic has already been reported.
    */
   private claimModuleName(name: string, span: Span, what: string): boolean {
-    if (PRIMITIVE_TYPES.has(name) || RESERVED_PRELUDE_NAMES.has(name)) {
+    if (PRIMITIVE_TYPES.has(name) || RESERVED_PRELUDE_NAMES.has(name) || PRELUDE_NAMES.has(name)) {
       this.diagnostics.add({
         code: Codes.DuplicateName,
         message: `'${name}' is a prelude name and cannot be declared`,
@@ -185,12 +278,31 @@ export class Checker {
     return true;
   }
 
+  private declareTypeParameters(parameters: readonly TypeParameterDecl[], ownerId: number): TypeParameterSymbol[] {
+    const seen = new Map<string, Span>();
+    return parameters.map((parameter, index) => {
+      const previous = seen.get(parameter.name);
+      if (previous) this.duplicate(parameter.name, parameter.span, previous);
+      if (PRIMITIVE_TYPES.has(parameter.name) || parameter.name === "Result" || parameter.name === "Decimal") {
+        this.diagnostics.add({
+          code: Codes.DuplicateName,
+          message: "'" + parameter.name + "' is a reserved type name",
+          span: parameter.span,
+          label: "choose another type parameter name",
+        });
+      }
+      seen.set(parameter.name, parameter.span);
+      return { ownerId, index, name: parameter.name, declarationSpan: parameter.span };
+    });
+  }
+
   /** Pass one: every `type` and `enum` exists before any member type is read. */
   private declareDataShells(module: Module): void {
     for (const declaration of module.declarations) {
       if (declaration.kind === "type") {
         if (!this.claimModuleName(declaration.name, declaration.nameSpan, "type")) continue;
         this.records.set(declaration.name, {
+          typeParameters: this.declareTypeParameters(declaration.typeParameters, this.nextDeclarationId),
           id: this.nextDeclarationId++,
           name: declaration.name,
           nameSpan: declaration.nameSpan,
@@ -203,6 +315,7 @@ export class Checker {
       if (declaration.kind === "enum") {
         if (!this.claimModuleName(declaration.name, declaration.nameSpan, "enum")) continue;
         this.enums.set(declaration.name, {
+          typeParameters: this.declareTypeParameters(declaration.typeParameters, this.nextDeclarationId),
           id: this.nextDeclarationId++,
           name: declaration.name,
           nameSpan: declaration.nameSpan,
@@ -237,7 +350,7 @@ export class Checker {
       seen.set(field.name, field.nameSpan);
       const symbol: FieldSymbol = {
         name: field.name,
-        type: this.resolveType(field.type),
+        type: this.resolveType(field.type, record.typeParameters),
         declarationSpan: field.nameSpan,
         index: record.fields.length,
       };
@@ -272,7 +385,7 @@ export class Checker {
           seenComponents.set(component.name, component.nameSpan);
           components.push({
             name: component.name,
-            type: this.resolveType(component.type),
+            type: this.resolveType(component.type, enumeration.typeParameters),
             declarationSpan: component.nameSpan,
             index: components.length,
           });
@@ -303,16 +416,20 @@ export class Checker {
     }
     const nodes = new Map<number, Node>();
 
-    const target = (type: KType): number | null => {
-      if (type.kind === "Record" || type.kind === "Enum") return type.declaration.id;
-      return null;
+    // Walk stored type expressions, including nullable wrappers and arguments.
+    // Edges are declaration identities: changing arguments cannot hide a cycle.
+    const targets = (type: KType): number[] => {
+      if (type.kind === "Nullable") return targets(type.inner);
+      if (type.kind === "Record" || type.kind === "Enum") {
+        return [type.declaration.id, ...type.arguments.flatMap(targets)];
+      }
+      return [];
     };
 
     for (const record of this.records.values()) {
       const edges: Node["edges"] = [];
       for (const field of record.fields) {
-        const to = target(field.type);
-        if (to !== null) edges.push({ to, via: field.name });
+        for (const to of targets(field.type)) edges.push({ to, via: field.name });
       }
       nodes.set(record.id, { name: record.name, nameSpan: record.nameSpan, edges });
     }
@@ -320,8 +437,7 @@ export class Checker {
       const edges: Node["edges"] = [];
       for (const variant of enumeration.variants) {
         for (const component of variant.payload ?? []) {
-          const to = target(component.type);
-          if (to !== null) edges.push({ to, via: `${variant.name}.${component.name}` });
+          for (const to of targets(component.type)) edges.push({ to, via: `${variant.name}.${component.name}` });
         }
       }
       nodes.set(enumeration.id, { name: enumeration.name, nameSpan: enumeration.nameSpan, edges });
@@ -508,7 +624,7 @@ export class Checker {
   }
 
   private checkFunction(declaration: FunctionDecl, symbol: FunctionSymbol): IRFunction {
-    this.scopes = [{ bindings: new Map() }];
+    this.scopes = [{ bindings: new Map(), refinements: new Map() }];
     this.returnType = symbol.returnType;
     for (const parameter of symbol.parameters) {
       this.scopes[0]!.bindings.set(parameter.name, parameter);
@@ -518,7 +634,9 @@ export class Checker {
     const bodyType = result.block.type;
     if (!isAssignable(bodyType, symbol.returnType)) {
       const span = declaration.body.tail?.span ?? declaration.body.span;
-      if (bodyType.kind === "Unit" && symbol.returnType.kind !== "Unit") {
+      if (symbol.returnType.kind === "Unit" && this.isResultType(bodyType)) {
+        this.reportDiscardedResult(span, bodyType);
+      } else if (bodyType.kind === "Unit" && symbol.returnType.kind !== "Unit") {
         this.diagnostics.add({
           code: Codes.TypeMismatch,
           message: `'${symbol.name}' must produce a ${typeName(symbol.returnType)} value`,
@@ -527,6 +645,12 @@ export class Checker {
           secondary: [{ span: declaration.returnType.span, message: "declared return type" }],
           notes: ["end the block with the value it produces, or use `return`"],
         });
+      } else if (
+        result.block.tail &&
+        bodyType.kind === "Nullable" &&
+        isAssignable(withoutNull(bodyType), symbol.returnType)
+      ) {
+        this.unsafeNullable(result.block.tail, typeName(symbol.returnType));
       } else {
         this.mismatch(bodyType, symbol.returnType, span, "this is the value the block produces");
       }
@@ -536,15 +660,54 @@ export class Checker {
     return { symbol, body: result.block };
   }
 
-  private resolveType(reference: TypeRef): KType {
+  private resolveType(reference: TypeRef, parameters: readonly TypeParameterSymbol[] = []): KType {
+    const inner = this.resolveTypeName(reference, parameters);
+    if (!reference.nullable) return inner;
+    if (inner.kind === "Error") return inner;
+    // Q08 has not settled how Unit and absence stay distinguishable.
+    if (inner.kind === "Unit") {
+      this.diagnostics.add({
+        code: Codes.Unsupported,
+        message: "'Unit?' is not available in this compiler slice",
+        span: reference.span,
+        label: "a nullable Unit is not supported yet",
+        notes: [
+          "Unit and absence must remain distinguishable, which is an unresolved Q08 question",
+          "see docs/implementation/slice-1c.md for the supported subset",
+        ],
+      });
+      return ErrorType;
+    }
+    return nullableType(inner);
+  }
+
+  private resolveTypeName(reference: TypeRef, parameters: readonly TypeParameterSymbol[]): KType {
+    const args = reference.arguments?.map((argument) => this.resolveType(argument, parameters)) ?? [];
+    const parameter = parameters.find((item) => item.name === reference.name);
     const primitive = PRIMITIVE_TYPES.get(reference.name);
-    if (primitive) return primitive;
-
     const record = this.records.get(reference.name);
-    if (record) return recordType(record);
-
     const enumeration = this.enums.get(reference.name);
-    if (enumeration) return enumType(enumeration);
+    const declaration = parameter ? undefined : record ?? enumeration;
+    if (parameter || primitive || declaration) {
+      const arity = declaration?.typeParameters.length ?? 0;
+      if (args.length !== arity || (arity === 0 && reference.arguments !== null)) {
+        this.diagnostics.add({
+          code: Codes.TypeArgumentCount,
+          message: arity === 0
+            ? `'${reference.name}' does not accept type arguments`
+            : `'${reference.name}' expects ${arity} type argument${arity === 1 ? "" : "s"}, but received ${args.length}`,
+          span: reference.span,
+          label: arity === 0 ? "this type does not accept type arguments" : "supply every type argument explicitly",
+          secondary: declaration ? [{ span: declaration.nameSpan, message: "declared here" }] : [],
+          notes: ["type arguments cannot be omitted, inferred, defaulted or partially applied"],
+        });
+        return ErrorType;
+      }
+      if (parameter) return { kind: "TypeParameter", parameter };
+      if (primitive) return primitive;
+      if (record) return recordType(record, args);
+      if (enumeration) return enumType(enumeration, args);
+    }
 
     const reserved = RESERVED_PRELUDE_NAMES.get(reference.name);
     if (reserved) {
@@ -593,6 +756,24 @@ export class Checker {
     return ErrorType;
   }
 
+  /** Keep the existing Unit? runtime boundary when substitution exposes it. */
+  private supportedMemberType(type: KType, span: Span): KType {
+    const containsNullableUnit = (value: KType): boolean => {
+      if (value.kind === "Nullable") return value.inner.kind === "Unit" || containsNullableUnit(value.inner);
+      if (value.kind === "Record" || value.kind === "Enum") return value.arguments.some(containsNullableUnit);
+      return false;
+    };
+    if (!containsNullableUnit(type)) return type;
+    this.diagnostics.add({
+      code: Codes.Unsupported,
+      message: "this member's substituted type contains unsupported 'Unit?'",
+      span,
+      label: "nullable Unit remains outside this compiler slice",
+      notes: ["Slice 1C's Unit/absence representation boundary remains unresolved under Q08"],
+    });
+    return ErrorType;
+  }
+
   private nearestTypeName(name: string): string | null {
     const candidates = [...PRIMITIVE_TYPES.keys(), ...this.records.keys(), ...this.enums.keys()];
     return nearest(name, candidates);
@@ -601,7 +782,7 @@ export class Checker {
   // -------------------------------------------------------------- statements
 
   private checkBlock(block: Block, expected: KType | null): BlockResult {
-    this.scopes.push({ bindings: new Map() });
+    this.pushScope();
     const statements: IRStatement[] = [];
     let alwaysReturns = false;
 
@@ -768,12 +949,14 @@ export class Checker {
         return this.checkNumeral(expression, expected, false);
       case "bool":
         return { kind: "bool", value: expression.value, type: BoolType, span: expression.span };
+      case "null":
+        return this.checkNull(expression.span, expected);
       case "string":
         return this.checkString(expression);
       case "name":
         return this.checkName(expression.name, expression.span);
       case "call":
-        return this.checkCall(expression);
+        return this.checkCall(expression, expected);
       case "unary":
         return this.checkUnary(expression, expected);
       case "binary":
@@ -804,6 +987,10 @@ export class Checker {
    */
   private checkMatch(expression: MatchExpression, expected: KType | null): IRExpression {
     const scrutinee = this.checkExpression(expression.scrutinee, null);
+
+    if (scrutinee.type.kind === "Nullable") {
+      return this.checkNullableMatch(expression, scrutinee, expected);
+    }
 
     if (scrutinee.type.kind !== "Enum") {
       if (scrutinee.type.kind !== "Error") {
@@ -847,12 +1034,12 @@ export class Checker {
         });
       }
 
-      const resolved = this.resolveArmPattern(arm.pattern, declaration, covered, catchAll, reachable);
+      const resolved = this.resolveArmPattern(arm.pattern, declaration, covered, catchAll, reachable, scrutinee.type.arguments);
       if (resolved.catchAll && reachable) catchAll = arm.pattern.span;
       if (resolved.failed && resolved.variant === null && !resolved.catchAll) sawBrokenPattern = true;
 
       // Pattern bindings live in the arm and nowhere else.
-      this.scopes.push({ bindings: new Map() });
+      this.pushScope();
       const bindings: (LocalSymbol | null)[] = [];
       for (const binding of resolved.bindings) {
         bindings.push(binding === null ? null : this.declarePatternBinding(binding.name, binding.type, binding.span));
@@ -918,10 +1105,148 @@ export class Checker {
     return { kind: "match", scrutinee, declaration, arms, type, span: expression.span };
   }
 
+  /**
+   * `match x { null => ..., value => ... }`.
+   *
+   * Slice 1C accepts a `null` arm and a catch-all, in either order. After a
+   * `null` arm the binding takes the non-null type; a binding arm placed first
+   * catches the remaining nullable domain and makes a later `null` arm
+   * unreachable (docs/spec/type-system.md).
+   */
+  private checkNullableMatch(
+    expression: MatchExpression,
+    scrutinee: IRExpression,
+    expected: KType | null,
+  ): IRExpression {
+    const declared = scrutinee.type;
+    const present = withoutNull(declared);
+
+    let nullArm: Span | null = null;
+    let catchAll: Span | null = null;
+    const arms: IRNullableArm[] = [];
+
+    let resultType: KType | null = null;
+    let resultSpan: Span | null = null;
+    let reportedTypeClash = false;
+    let sawUnsupportedPattern = false;
+
+    for (const arm of expression.arms) {
+      const pattern = arm.pattern;
+      let test: "null" | "catch-all" | null = null;
+      let bindingName: { name: string; span: Span } | null = null;
+      let failed = false;
+
+      if (pattern.kind === "null-pattern") {
+        if (nullArm || catchAll) {
+          this.unreachableArm(pattern.span, nullArm ?? catchAll!, catchAll !== null);
+          failed = true;
+        }
+        test = "null";
+        if (!nullArm) nullArm = pattern.span;
+      } else if (pattern.kind === "wildcard" || pattern.kind === "binding") {
+        if (catchAll) {
+          this.unreachableArm(pattern.span, catchAll, true);
+          failed = true;
+        }
+        test = "catch-all";
+        if (pattern.kind === "binding") bindingName = { name: pattern.name, span: pattern.span };
+        if (!catchAll) catchAll = pattern.span;
+      } else if (pattern.kind === "variant-pattern") {
+        const first = !sawUnsupportedPattern;
+        sawUnsupportedPattern = true;
+        failed = true;
+        if (first) {
+          this.diagnostics.add({
+            code: Codes.Unsupported,
+            message: "matching a variant through a nullable value is not available in this compiler slice",
+            span: pattern.span,
+            label: "this pattern reaches past the absent case",
+            notes: [
+            `handle absence first, then match the value: \`match x { null => ..., value => match value { ... } }\``,
+              "see docs/implementation/slice-1c.md for the supported subset",
+            ],
+          });
+        }
+      } else {
+        failed = true;
+      }
+
+      // The bound value is non-null only once the null case is behind it.
+      const bindingType = nullArm !== null && test === "catch-all" ? present : declared;
+
+      this.pushScope();
+      const binding = bindingName
+        ? this.declarePatternBinding(bindingName.name, bindingType, bindingName.span)
+        : null;
+      const body = this.checkBlock(arm.body, expected);
+      this.scopes.pop();
+
+      if (test !== null) arms.push({ test, binding, body: body.block, span: arm.span });
+
+      if (failed) continue;
+
+      if (resultType === null) {
+        resultType = body.block.type;
+        resultSpan = arm.body.span;
+        continue;
+      }
+      const merged = unify(resultType, body.block.type);
+      if (merged) {
+        if (body.block.type.kind !== "Never") resultType = merged;
+        continue;
+      }
+      if (!reportedTypeClash) {
+        reportedTypeClash = true;
+        this.armTypeClash(arm.body.span, body.block.type, resultType, resultSpan);
+      }
+    }
+
+    if (!catchAll && !sawUnsupportedPattern) {
+      this.diagnostics.add({
+        code: Codes.NonExhaustiveMatch,
+        message: `this match does not cover the case where the value is present`,
+        span: expression.span,
+        label: `a ${typeName(present)} value has no arm`,
+        notes: [
+          "a match covers every case, so a value can never fall through without an answer",
+          "add an arm that names the value, as in `value => ...`, or a '_' arm",
+        ],
+      });
+    }
+
+    const type = resultType ?? ErrorType;
+    return { kind: "nullable-match", scrutinee, arms, type, span: expression.span };
+  }
+
+  private unreachableArm(span: Span, previous: Span, afterCatchAll: boolean): void {
+    this.diagnostics.add({
+      code: Codes.UnreachableArm,
+      message: "this arm can never run",
+      span,
+      label: afterCatchAll ? "everything left is already matched" : "this case is already matched above",
+      secondary: [{ span: previous, message: afterCatchAll ? "this arm matches every remaining value" : "matched here first" }],
+      notes: ["arms are tried in order, so only the first arm that fits ever runs"],
+    });
+  }
+
+  private armTypeClash(span: Span, found: KType, established: KType, establishedSpan: Span | null): void {
+    this.diagnostics.add({
+      code: Codes.TypeMismatch,
+      message: "the arms of this match produce different types",
+      span,
+      label: `this arm produces ${typeName(found)}`,
+      secondary: establishedSpan ? [{ span: establishedSpan, message: `an earlier arm produces ${typeName(established)}` }] : [],
+      notes: [
+        "every arm of a match has to produce the same type, because the match itself is one value",
+        "Koda never widens the arms to a shared type on its own",
+      ],
+    });
+  }
+
   /** Checks arm bodies for their own errors when the match itself is invalid. */
   private checkArmsForErrorsOnly(expression: MatchExpression): void {
     for (const arm of expression.arms) {
-      this.scopes.push({ bindings: new Map() });
+      this.pushScope();
       this.checkBlock(arm.body, null);
       this.scopes.pop();
     }
@@ -937,6 +1262,7 @@ export class Checker {
     covered: Map<string, Span>,
     catchAll: Span | null,
     reachable: boolean,
+    typeArguments: readonly KType[],
   ): {
     variant: VariantSymbol | null;
     catchAll: boolean;
@@ -946,8 +1272,31 @@ export class Checker {
     if (pattern.kind === "pattern-error") return { variant: null, catchAll: false, failed: true, bindings: [] };
 
     if (pattern.kind === "binding") {
-      // Only reachable from inside a payload list; the parser rejects it as a
-      // whole arm. Guarded so the shape stays total.
+      // Slice 1C introduces bare-name binding patterns only for matching a
+      // nullable value; they are not generalised to enums here.
+      this.diagnostics.add({
+        code: Codes.Unsupported,
+        message: "a bare name is not available as a whole pattern when matching an enum",
+        span: pattern.span,
+        label: "this would bind every remaining variant",
+        notes: [
+          "'_' matches the remaining variants without binding them",
+          `a qualified variant such as '${declaration.name}.${declaration.variants[0]?.name ?? "Variant"}' matches one case`,
+          "see docs/implementation/slice-1c.md for the supported subset",
+        ],
+      });
+      return { variant: null, catchAll: false, failed: true, bindings: [] };
+    }
+
+    if (pattern.kind === "null-pattern") {
+      this.diagnostics.add({
+        code: Codes.TypeMismatch,
+        message: `'${declaration.name}' always holds a value, so it has no null case`,
+        span: pattern.span,
+        label: "this pattern matches an absent value",
+        secondary: [{ span: declaration.nameSpan, message: `the value being matched is ${declaration.name}` }],
+        notes: [`declare it as '${declaration.name}?' if it may be absent`],
+      });
       return { variant: null, catchAll: false, failed: true, bindings: [] };
     }
 
@@ -969,7 +1318,33 @@ export class Checker {
       return { variant: null, catchAll: true, failed: false, bindings: [] };
     }
 
-    if (pattern.enumName !== declaration.name) {
+    if (pattern.enumName === null) {
+      // `Ok(value)` is accepted only for the prelude Result. ADR 0011 keeps
+      // ordinary user enum variants qualified.
+      if (!this.resultDeclaration || declaration.id !== this.resultDeclaration.id) {
+        this.diagnostics.add({
+          code: Codes.UnresolvedName,
+          message: `'${pattern.variantName}' must say which enum it belongs to`,
+          span: pattern.span,
+          label: "this variant is not qualified",
+          secondary: [{ span: declaration.nameSpan, message: `the value being matched is ${declaration.name}` }],
+          notes: [
+            `write \`${declaration.name}.${pattern.variantName}\``,
+            "only the prelude 'Ok' and 'Err' may be written without their enum name",
+          ],
+        });
+        // Declare whatever names the pattern wrote, so the arm body does not
+        // report each of them as unresolved on top of this error.
+        return {
+          variant: null,
+          catchAll: false,
+          failed: true,
+          bindings: (pattern.payload ?? []).map((sub) =>
+            sub.kind === "binding" ? { name: sub.name, type: ErrorType, span: sub.span } : null,
+          ),
+        };
+      }
+    } else if (pattern.enumName !== declaration.name) {
       const other = this.enums.get(pattern.enumName);
       if (other) {
         this.diagnostics.add({
@@ -1026,7 +1401,7 @@ export class Checker {
     }
     if (!previous) covered.set(variant.name, pattern.span);
 
-    const payload = variant.payload ?? [];
+    const payload = (variant.payload ?? []).map((field) => instantiatedField(field, declaration.id, typeArguments));
     const written = pattern.payload;
 
     if (written === null) {
@@ -1082,7 +1457,7 @@ export class Checker {
       if (sub.kind === "binding") {
         // The binding takes its type from the declared payload field; its name
         // is free and need not match that field (ADR 0011 follow-up).
-        bindings.push({ name: sub.name, type: field.type, span: sub.span });
+        bindings.push({ name: sub.name, type: this.supportedMemberType(field.type, sub.span), span: sub.span });
         continue;
       }
       if (sub.kind === "variant-pattern") {
@@ -1117,7 +1492,7 @@ export class Checker {
       if (moduleName || existingFunction) {
         this.duplicate(name, span, moduleName?.span ?? existingFunction!.declarationSpan);
         rejected = true;
-      } else if (PRIMITIVE_TYPES.has(name) || RESERVED_PRELUDE_NAMES.has(name)) {
+      } else if (PRIMITIVE_TYPES.has(name) || RESERVED_PRELUDE_NAMES.has(name) || PRELUDE_NAMES.has(name)) {
         this.diagnostics.add({
           code: Codes.DuplicateName,
           message: `'${name}' is a prelude name and cannot be used as a pattern binding`,
@@ -1149,6 +1524,16 @@ export class Checker {
    * exactly once and to reject unknown fields. Entries keep their source order
    * so that side effects still run left to right.
    */
+  private unsupportedGenericConstruction(name: string, span: Span): void {
+    this.diagnostics.add({
+      code: Codes.Unsupported,
+      message: "construction of generic '" + name + "' values is not available in Slice 2A",
+      span,
+      label: "generic construction is outside this slice",
+      notes: ["concrete applications are available in type positions only; construction spelling and inference are not implemented"],
+    });
+  }
+
   private checkRecord(expression: Extract<Expression, { kind: "record" }>): IRExpression {
     const record = this.records.get(expression.typeName);
     if (!record) {
@@ -1176,6 +1561,12 @@ export class Checker {
           ],
         });
       }
+      for (const field of expression.fields) this.checkExpression(field.value, null);
+      return this.errorValue(expression.span);
+    }
+
+    if (record.typeParameters.length > 0) {
+      this.unsupportedGenericConstruction(record.name, expression.typeSpan);
       for (const field of expression.fields) this.checkExpression(field.value, null);
       return this.errorValue(expression.span);
     }
@@ -1263,6 +1654,11 @@ export class Checker {
     const target = this.checkExpression(expression.target, null);
     if (target.type.kind === "Error") return this.errorValue(expression.span);
 
+    if (target.type.kind === "Nullable") {
+      this.unsafeNullable(target, typeName(withoutNull(target.type)));
+      return this.errorValue(expression.span);
+    }
+
     if (target.type.kind !== "Record") {
       this.diagnostics.add({
         code: Codes.TypeMismatch,
@@ -1278,7 +1674,8 @@ export class Checker {
     }
 
     const declaration = target.type.declaration;
-    const field = declaration.fieldsByName.get(expression.name);
+    const declaredField = declaration.fieldsByName.get(expression.name);
+    const field = declaredField && instantiatedField(declaredField, declaration.id, target.type.arguments);
     if (!field) {
       this.unknownMember(
         declaration.name,
@@ -1291,19 +1688,107 @@ export class Checker {
       return this.errorValue(expression.span);
     }
 
-    return { kind: "field", target, field, type: field.type, span: expression.span };
+    return { kind: "field", target, field, type: this.supportedMemberType(field.type, expression.span), span: expression.span };
   }
 
   /**
    * `Status.Pending`, or `Status.Paid(...)` when `args` is supplied.
    * A variant with a payload must be called; one without must not be.
    */
+  /**
+   * Contextual Result construction.
+   *
+   * A constructor determines only its own payload, so the complete
+   * `Result<T, E>` must come from the expected type. Exactly one outer nullable
+   * wrapper is looked through; the constructor still produces the underlying
+   * `Result<T, E>`, and the ordinary non-null-into-nullable rule performs the
+   * injection. Nothing else is inspected - no sibling branches, no later uses,
+   * no other wrappers, no inference variables.
+   */
+  private checkResultConstructor(
+    expression: Extract<Expression, { kind: "call" }>,
+    constructor: string,
+    expected: KType | null,
+  ): IRExpression {
+    const declaration = this.resultDeclaration;
+    const span = expression.span;
+    if (!declaration) return this.errorValue(span);
+
+    // Peel exactly one outer Nullable, and nothing more.
+    const target = expected && expected.kind === "Nullable" ? expected.inner : expected;
+
+    if (!target || !this.isResult(target)) {
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      this.unconstrainedResult(constructor, span, target);
+      return this.errorValue(span);
+    }
+
+    const args = target.arguments;
+    const variant = declaration.variantsByName.get(constructor)!;
+    const field = instantiatedField(variant.payload![0]!, declaration.id, args);
+
+    if (expression.args.length !== 1) {
+      this.diagnostics.add({
+        code: Codes.ArgumentCount,
+        message: `'${constructor}' takes exactly one value, but ${expression.args.length} ${expression.args.length === 1 ? "was" : "were"} given`,
+        span,
+        label: `this gives ${expression.args.length}`,
+        notes: [`write \`${constructor}(${field.name})\`, where ${field.name} is ${typeName(field.type)}`],
+      });
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
+
+    const value = this.checkExpression(expression.args[0]!, field.type);
+    this.expect(value, field.type, `'${constructor}' carries ${typeName(field.type)} here`);
+
+    // The constructor's own type is the underlying Result, never the nullable.
+    return { kind: "variant", declaration, variant, args: [value], type: enumType(declaration, args), span };
+  }
+
+  /** `Ok(...)` / `Err(...)` with nothing to say what the other side holds. */
+  private unconstrainedResult(constructor: string, span: Span, found: KType | null): void {
+    const missing = constructor === RESULT_OK ? "error" : "success";
+    const other = constructor === RESULT_OK ? RESULT_ERR : RESULT_OK;
+    const notes = [
+      `'${constructor}' says what the ${constructor === RESULT_OK ? "success" : "error"} value is, but nothing here says what '${other}' would hold`,
+      "give it a context that names both sides, such as a return type `-> Result<Value, Error>`, an annotated binding, or a parameter",
+      "Koda never invents the missing type",
+    ];
+    if (found && found.kind !== "Error") {
+      notes.unshift(`this position expects ${typeName(found)}, which is not a Result`);
+    }
+    this.diagnostics.add({
+      code: Codes.TypeMismatch,
+      message: `this '${constructor}' has no ${missing} type`,
+      span,
+      label: `nothing here says what '${other}' would hold`,
+      notes,
+    });
+  }
+
   private checkVariant(
     declaration: EnumDeclaration,
     member: Extract<Expression, { kind: "member" }>,
     args: readonly Expression[] | null,
     span: Span,
   ): IRExpression {
+    if (this.resultDeclaration && declaration.id === this.resultDeclaration.id) {
+      this.diagnostics.add({
+        code: Codes.TypeMismatch,
+        message: `'Result.${member.name}' is not how a Result is built`,
+        span,
+        label: "the prelude constructors are written without the enum name",
+        notes: [`write \`${member.name}(...)\` on its own`],
+      });
+      for (const argument of args ?? []) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
+    if (declaration.typeParameters.length > 0) {
+      this.unsupportedGenericConstruction(declaration.name, span);
+      for (const argument of args ?? []) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
     const variant = declaration.variantsByName.get(member.name);
     if (!variant) {
       this.unknownMember(
@@ -1365,6 +1850,41 @@ export class Checker {
 
   private errorValue(span: Span): IRExpression {
     return { kind: "bool", value: false, type: ErrorType, span };
+  }
+
+  /**
+   * `null` has no type of its own. The expected type supplies one; without a
+   * nullable expectation it is rejected, because inference must not invent an
+   * unsafe type (docs/spec/type-system.md).
+   */
+  private checkNull(span: Span, expected: KType | null): IRExpression {
+    if (expected && expected.kind === "Nullable") {
+      return { kind: "null", type: expected, span };
+    }
+    if (expected && expected.kind !== "Error") {
+      this.diagnostics.add({
+        code: Codes.TypeMismatch,
+        message: `expected ${typeName(expected)}, found null`,
+        span,
+        label: `${typeName(expected)} always holds a value`,
+        notes: [
+          `write '${typeName(expected)}?' where the value may be absent`,
+          "null is not a value of a non-nullable type",
+        ],
+      });
+      return this.errorValue(span);
+    }
+    this.diagnostics.add({
+      code: Codes.TypeMismatch,
+      message: "this null has no type",
+      span,
+      label: "nothing here says what may be absent",
+      notes: [
+        "annotate the binding, as in `name: String? = null`, or pass null where a nullable type is expected",
+        "Koda never guesses a type for a bare null",
+      ],
+    });
+    return this.errorValue(span);
   }
 
   /**
@@ -1490,7 +2010,10 @@ export class Checker {
 
   private checkName(name: string, span: Span): IRExpression {
     const local = this.lookupLocal(name);
-    if (local) return { kind: "local", symbol: local, type: local.type, span };
+    if (local) {
+      const refined = this.lookupRefinement(local.id) ?? local.type;
+      return { kind: "local", symbol: local, type: refined, span };
+    }
 
     const fn = this.functions.get(name);
     if (fn) {
@@ -1557,7 +2080,19 @@ export class Checker {
     return this.errorValue(span);
   }
 
-  private checkCall(expression: Extract<Expression, { kind: "call" }>): IRExpression {
+  private checkCall(
+    expression: Extract<Expression, { kind: "call" }>,
+    expected: KType | null = null,
+  ): IRExpression {
+    // `Ok(...)` / `Err(...)` are the prelude Result constructors. They are the
+    // only calls that read the expected type, and they read nothing else.
+    if (expression.callee.kind === "name") {
+      const calleeName = expression.callee.name;
+      if (calleeName === RESULT_OK || calleeName === RESULT_ERR) {
+        return this.checkResultConstructor(expression, calleeName, expected);
+      }
+    }
+
     // `Status.Paid(...)` is a variant construction rather than a function call.
     if (expression.callee.kind === "member") {
       const callee = expression.callee;
@@ -1683,6 +2218,14 @@ export class Checker {
   private checkBinary(expression: Extract<Expression, { kind: "binary" }>, expected: KType | null): IRExpression {
     const { operator, span, operatorSpan } = expression;
 
+    // A null comparison is an absence test wherever it appears, not only in a
+    // control head. Only its *refinement* is limited to conditions, which is
+    // why the result is used here for its value alone.
+    if (operator === "==" || operator === "!=") {
+      const test = this.checkNullTest(expression);
+      if (test) return test.ir;
+    }
+
     if (operator === "&&" || operator === "||") {
       const left = this.checkExpression(expression.left, BoolType);
       const right = this.checkExpression(expression.right, BoolType);
@@ -1794,11 +2337,131 @@ export class Checker {
     return { kind: "int-arith", operator, left, right, type: IntType, span };
   }
 
+  /**
+   * Checks a condition and reports what it proves in each branch.
+   *
+   * Only two forms refine (ADR 0007 follow-up): a direct null comparison, and
+   * `&&`, whose right operand is checked under the refinements its left
+   * operand established. `||`, negation and an intermediate Bool are
+   * deliberately not sources of refinement.
+   */
+  private checkCondition(expression: Expression): CheckedCondition {
+    if (expression.kind === "paren") return this.checkCondition(expression.expression);
+
+    if (expression.kind === "binary" && expression.operator === "&&") {
+      const left = this.checkCondition(expression.left);
+      // The right operand sees what the left one proved.
+      this.pushScope(left.whenTrue);
+      const right = this.checkCondition(expression.right);
+      this.scopes.pop();
+
+      this.expect(left.ir, BoolType, "'&&' needs Bool values");
+      this.expect(right.ir, BoolType, "'&&' needs Bool values");
+      return {
+        ir: {
+          kind: "logical",
+          operator: "&&",
+          left: left.ir,
+          right: right.ir,
+          type: BoolType,
+          span: expression.span,
+        },
+        // Both must hold for the whole condition to be true. Nothing follows
+        // from it being false, so the else branch learns nothing.
+        whenTrue: [...left.whenTrue, ...right.whenTrue],
+        whenFalse: [],
+      };
+    }
+
+    if (expression.kind === "binary" && (expression.operator === "==" || expression.operator === "!=")) {
+      const test = this.checkNullTest(expression);
+      if (test) return test;
+    }
+
+    const ir = this.checkExpression(expression, BoolType);
+    return { ir, whenTrue: [], whenFalse: [] };
+  }
+
+  /**
+   * `x != null` / `x == null`.
+   *
+   * Returns null when neither side is the null literal, leaving ordinary
+   * equality to handle the expression.
+   */
+  private checkNullTest(expression: Extract<Expression, { kind: "binary" }>): CheckedCondition | null {
+    const leftIsNull = this.isNullLiteral(expression.left);
+    const rightIsNull = this.isNullLiteral(expression.right);
+    if (!leftIsNull && !rightIsNull) return null;
+
+    const negated = expression.operator === "!=";
+    const span = expression.span;
+
+    if (leftIsNull && rightIsNull) {
+      this.diagnostics.add({
+        code: Codes.TypeMismatch,
+        message: "this comparison has nothing to test",
+        span,
+        label: "both sides are null",
+        notes: ["compare a value that may be absent against null, as in `name != null`"],
+      });
+      return { ir: this.errorValue(span), whenTrue: [], whenFalse: [] };
+    }
+
+    const valueExpression = leftIsNull ? expression.right : expression.left;
+    const operand = this.checkExpression(valueExpression, null);
+
+    if (operand.type.kind === "Error") {
+      return { ir: this.errorValue(span), whenTrue: [], whenFalse: [] };
+    }
+
+    if (operand.type.kind !== "Nullable") {
+      this.diagnostics.add({
+        code: Codes.TypeMismatch,
+        message: `${typeName(operand.type)} always holds a value, so comparing it with null is not allowed`,
+        span,
+        label: `this is ${typeName(operand.type)}, never absent`,
+        notes: [
+          "null is not a value of a non-nullable type, so this test could never change anything",
+          `declare it as '${typeName(operand.type)}?' if it may be absent`,
+        ],
+      });
+      return { ir: this.errorValue(span), whenTrue: [], whenFalse: [] };
+    }
+
+    const ir: IRExpression = {
+      kind: "null-test",
+      operand,
+      negated,
+      type: BoolType,
+      span,
+    };
+
+    // Only a stable binding is refined; any other operand still type-checks.
+    const symbol = this.refinableSymbol(valueExpression);
+    if (!symbol) return { ir, whenTrue: [], whenFalse: [] };
+
+    const present: Refinement[] = [{ symbol, type: withoutNull(operand.type) }];
+    return negated
+      ? { ir, whenTrue: present, whenFalse: [] }
+      : { ir, whenTrue: [], whenFalse: present };
+  }
+
+  private isNullLiteral(expression: Expression): boolean {
+    if (expression.kind === "paren") return this.isNullLiteral(expression.expression);
+    return expression.kind === "null";
+  }
+
   private checkIf(expression: IfExpression, expected: KType | null): IRExpression {
-    const condition = this.checkExpression(expression.condition, BoolType);
+    const checked = this.checkCondition(expression.condition);
+    const condition = checked.ir;
     this.expect(condition, BoolType, "an `if` condition must be a Bool");
 
+    // Refinement is lexical: it lives in a scope around the branch and is gone
+    // once that scope pops, which is what makes an ordinary join restore the
+    // declared nullable type.
+    this.pushScope(checked.whenTrue);
     const then = this.checkBlock(expression.then, expected);
+    this.scopes.pop();
 
     if (!expression.otherwise) {
       const produced = then.block.type.kind;
@@ -1821,10 +2484,12 @@ export class Checker {
       };
     }
 
+    this.pushScope(checked.whenFalse);
     const otherwise =
       expression.otherwise.kind === "if"
         ? this.wrapExpressionBlock(this.checkExpression(expression.otherwise, expected))
         : this.checkBlock(expression.otherwise, expected);
+    this.scopes.pop();
 
     const type = unify(then.block.type, otherwise.block.type);
     if (!type) {
@@ -1861,6 +2526,34 @@ export class Checker {
 
   // ------------------------------------------------------------------ helpers
 
+  private pushScope(refinements: readonly Refinement[] = []): void {
+    const map = new Map<number, KType>();
+    for (const refinement of refinements) map.set(refinement.symbol.id, refinement.type);
+    this.scopes.push({ bindings: new Map(), refinements: map });
+  }
+
+  /** The innermost active refinement for a symbol, if any. */
+  private lookupRefinement(id: number): KType | null {
+    for (let index = this.scopes.length - 1; index >= 0; index -= 1) {
+      const found = this.scopes[index]!.refinements.get(id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /**
+   * ADR 0007 follow-up: only a stable binding refines - an immutable local or
+   * an immutable parameter. A mutable local can be rebound, and a member
+   * expression is an aliased property, so neither qualifies.
+   */
+  private refinableSymbol(expression: Expression): LocalSymbol | null {
+    if (expression.kind === "paren") return this.refinableSymbol(expression.expression);
+    if (expression.kind !== "name") return null;
+    const local = this.lookupLocal(expression.name);
+    if (!local || local.mutable) return null;
+    return local;
+  }
+
   private lookupLocal(name: string): LocalSymbol | null {
     for (let index = this.scopes.length - 1; index >= 0; index -= 1) {
       const found = this.scopes[index]!.bindings.get(name);
@@ -1871,7 +2564,63 @@ export class Checker {
 
   private expect(value: IRExpression, expected: KType, label: string): void {
     if (isAssignable(value.type, expected)) return;
+    if (expected.kind === "Unit" && this.isResultType(value.type)) {
+      this.reportDiscardedResult(value.span, value.type);
+      return;
+    }
+    // Using a `T?` where a `T` is wanted is the specific mistake KODA-T0002
+    // names, and docs/spec/diagnostics.md prescribes what it must show.
+    if (value.type.kind === "Nullable" && isAssignable(withoutNull(value.type), expected)) {
+      this.unsafeNullable(value, typeName(withoutNull(value.type)));
+      return;
+    }
     this.mismatch(value.type, expected, value.span, label);
+  }
+
+  /** KODA-T0002: a nullable value used where a present one is required. */
+  private unsafeNullable(value: IRExpression, innerName: string): void {
+    const declaration = value.kind === "local" ? value.symbol : null;
+    const name = declaration?.name ?? "this value";
+    this.diagnostics.add({
+      code: Codes.UnsafeNullable,
+      message: `${declaration ? `'${name}'` : "this value"} may be absent, so it cannot be used as ${innerName} here`,
+      span: value.span,
+      label: `this is ${typeName(value.type)}`,
+      secondary: declaration
+        ? [{ span: declaration.declarationSpan, message: `'${name}' is declared ${typeName(declaration.type)}` }]
+        : [],
+      notes: [
+        `check it first: \`if ${declaration ? name : "value"} != null { ... }\``,
+        `or handle both cases: \`match ${declaration ? name : "value"} { null => ..., present => ... }\``,
+        ...(declaration?.mutable
+          ? ["a `mut` binding cannot be refined, because it may be rebound; bind it to an immutable name first"]
+          : []),
+      ],
+    });
+  }
+
+  /** True for a direct `Result<T, E>`. */
+  private isResultType(type: KType): boolean {
+    return type.kind === "Enum" && type.declaration.id === this.resultDeclaration?.id;
+  }
+
+  /**
+   * ADR 0010: a Result in a position that wants nothing is a discarded Result.
+   * Saying so beats "expected Unit, found Result", which describes the same
+   * statement less usefully.
+   */
+  private reportDiscardedResult(span: Span, type: KType): void {
+    this.diagnostics.add({
+      code: Codes.DiscardedResult,
+      message: `this ${typeName(type)} is thrown away without being looked at`,
+      span,
+      label: "the operation may have failed, and nothing here checks",
+      notes: [
+        "a Result says an operation can succeed or fail; Koda will not let the failure pass silently",
+        "handle it with `match ... { Ok(value) => ..., Err(error) => ... }`",
+        "or bind it, return it, or pass it to something that takes responsibility",
+      ],
+    });
   }
 
   private mismatch(actual: KType, expected: KType, span: Span, label: string): void {

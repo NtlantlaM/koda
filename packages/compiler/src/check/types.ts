@@ -1,5 +1,5 @@
 /**
- * The type lattice of the slice-1A subset.
+ * The type lattice through Slice 2A.
  *
  * docs/spec/type-system.md lists `Bool`, `String`, `Int`, `Float` and `Unit` as
  * the primitives, and gives Koda-defined `type` and `enum` declarations
@@ -26,6 +26,7 @@ export interface FieldSymbol {
 
 export interface RecordDeclaration {
   readonly id: number;
+  readonly typeParameters: readonly TypeParameterSymbol[];
   readonly name: string;
   readonly nameSpan: Span;
   readonly exported: boolean;
@@ -47,6 +48,7 @@ export interface VariantSymbol {
 
 export interface EnumDeclaration {
   readonly id: number;
+  readonly typeParameters: readonly TypeParameterSymbol[];
   readonly name: string;
   readonly nameSpan: Span;
   readonly exported: boolean;
@@ -57,10 +59,21 @@ export interface EnumDeclaration {
 
 export type PrimitiveKind = "Bool" | "String" | "Int" | "Float" | "Unit" | "Never" | "Error";
 
+/** A binder is identified by its declaration and source-order position, not spelling. */
+export interface TypeParameterSymbol {
+  readonly ownerId: number;
+  readonly index: number;
+  readonly name: string;
+  readonly declarationSpan: Span;
+}
+
 export type KType =
   | { readonly kind: PrimitiveKind }
-  | { readonly kind: "Record"; readonly declaration: RecordDeclaration }
-  | { readonly kind: "Enum"; readonly declaration: EnumDeclaration };
+  | { readonly kind: "Record"; readonly declaration: RecordDeclaration; readonly arguments: readonly KType[] }
+  | { readonly kind: "Enum"; readonly declaration: EnumDeclaration; readonly arguments: readonly KType[] }
+  | { readonly kind: "TypeParameter"; readonly parameter: TypeParameterSymbol }
+  /** `T?`. `inner` is never itself nullable: written `T??` is rejected. */
+  | { readonly kind: "Nullable"; readonly inner: KType };
 
 export const BoolType: KType = { kind: "Bool" };
 export const StringType: KType = { kind: "String" };
@@ -78,16 +91,41 @@ export const PRIMITIVE_TYPES: ReadonlyMap<string, KType> = new Map([
   ["Unit", UnitType],
 ]);
 
-export function recordType(declaration: RecordDeclaration): KType {
-  return { kind: "Record", declaration };
+export function recordType(declaration: RecordDeclaration, args: readonly KType[] = []): KType {
+  return { kind: "Record", declaration, arguments: args };
 }
 
-export function enumType(declaration: EnumDeclaration): KType {
-  return { kind: "Enum", declaration };
+export function enumType(declaration: EnumDeclaration, args: readonly KType[] = []): KType {
+  return { kind: "Enum", declaration, arguments: args };
+}
+
+/**
+ * `T?`.
+ *
+ * ADR 0007 rejects written `T??` and keeps one observable absence layer, so a
+ * nullable of a nullable collapses rather than nesting. The parser reports the
+ * written form; this guard keeps the invariant for every other construction.
+ */
+export function nullableType(inner: KType): KType {
+  if (inner.kind === "Nullable") return inner;
+  return { kind: "Nullable", inner };
+}
+
+export function isNullable(type: KType): boolean {
+  return type.kind === "Nullable";
+}
+
+/** The non-null type inside `T?`, or the type itself when it is not nullable. */
+export function withoutNull(type: KType): KType {
+  return type.kind === "Nullable" ? type.inner : type;
 }
 
 export function typeName(type: KType): string {
-  if (type.kind === "Record" || type.kind === "Enum") return type.declaration.name;
+  if (type.kind === "Nullable") return `${typeName(type.inner)}?`;
+  if (type.kind === "TypeParameter") return type.parameter.name;
+  if (type.kind === "Record" || type.kind === "Enum") {
+    return type.declaration.name + (type.arguments.length ? `<${type.arguments.map(typeName).join(", ")}>` : "");
+  }
   return type.kind === "Never" ? "Unit" : type.kind;
 }
 
@@ -104,14 +142,32 @@ export function hasEquality(type: KType): boolean {
 }
 
 /** Nominal identity: the same declaration, not the same shape. */
-function sameDeclaration(left: KType, right: KType): boolean {
-  if (left.kind === "Record" && right.kind === "Record") {
-    return left.declaration.id === right.declaration.id;
+export function sameType(left: KType, right: KType): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === "Nullable" && right.kind === "Nullable") return sameType(left.inner, right.inner);
+  if (left.kind === "TypeParameter" && right.kind === "TypeParameter") {
+    return left.parameter.ownerId === right.parameter.ownerId && left.parameter.index === right.parameter.index;
   }
-  if (left.kind === "Enum" && right.kind === "Enum") {
-    return left.declaration.id === right.declaration.id;
+  if ((left.kind === "Record" || left.kind === "Enum") && (right.kind === "Record" || right.kind === "Enum")) {
+    return left.declaration.id === right.declaration.id && left.arguments.length === right.arguments.length &&
+      left.arguments.every((argument, index) => sameType(argument, right.arguments[index]!));
   }
-  return false;
+  return true;
+}
+
+/** Substitute only syntax-sized type trees; never expand declaration members. */
+export function substitute(type: KType, ownerId: number, args: readonly KType[]): KType {
+  if (type.kind === "TypeParameter") {
+    return type.parameter.ownerId === ownerId ? args[type.parameter.index] ?? ErrorType : type;
+  }
+  if (type.kind === "Nullable") return nullableType(substitute(type.inner, ownerId, args));
+  if (type.kind === "Record") return recordType(type.declaration, type.arguments.map((arg) => substitute(arg, ownerId, args)));
+  if (type.kind === "Enum") return enumType(type.declaration, type.arguments.map((arg) => substitute(arg, ownerId, args)));
+  return type;
+}
+
+export function instantiatedField(field: FieldSymbol, ownerId: number, args: readonly KType[]): FieldSymbol {
+  return { ...field, type: substitute(field.type, ownerId, args) };
 }
 
 /**
@@ -121,8 +177,13 @@ function sameDeclaration(left: KType, right: KType): boolean {
 export function isAssignable(value: KType, expected: KType): boolean {
   if (value.kind === "Error" || expected.kind === "Error") return true;
   if (value.kind === "Never") return true;
-  if (value.kind === "Record" || value.kind === "Enum") return sameDeclaration(value, expected);
-  return value.kind === expected.kind;
+  // `T` may be used where `T?` is expected; the reverse requires a check.
+  if (expected.kind === "Nullable") {
+    const inner = value.kind === "Nullable" ? value.inner : value;
+    return isAssignable(inner, expected.inner);
+  }
+  if (value.kind === "Nullable") return false;
+  return sameType(value, expected);
 }
 
 /** The common type of two branches, or null when they disagree. */
@@ -131,8 +192,11 @@ export function unify(left: KType, right: KType): KType | null {
   if (right.kind === "Error") return left;
   if (left.kind === "Never") return right;
   if (right.kind === "Never") return left;
-  if (left.kind === "Record" || left.kind === "Enum") {
-    return sameDeclaration(left, right) ? left : null;
+  // docs/spec/type-system.md allows explicit nullable injection between arms,
+  // so `T` and `T?` agree at `T?`. Nothing else widens.
+  if (left.kind === "Nullable" || right.kind === "Nullable") {
+    const merged = unify(withoutNull(left), withoutNull(right));
+    return merged === null ? null : nullableType(merged);
   }
-  return left.kind === right.kind ? left : null;
+  return sameType(left, right) ? left : null;
 }

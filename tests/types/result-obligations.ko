@@ -1,0 +1,134 @@
+// Slice 2C: Result must-handle analysis (ADR 0010). Every function here is
+// rejected; each relies on a failure nobody looks at.
+import { print } from "koda:io"
+
+enum E {
+    A
+}
+
+fn op() -> Result<Int, E> {
+    Ok(1)
+}
+
+fn nested() -> Result<Result<Int, E>, E> {
+    Ok(op())
+}
+
+fn maybe(flag: Bool) -> Result<Int, E>? {
+    if flag {
+        Ok(1)
+    } else {
+        null
+    }
+}
+
+fn handle(r: Result<Int, E>) -> Unit {
+    match r {
+        Ok(_) => {}
+        Err(_) => {}
+    }
+}
+
+fn other() -> Unit {
+}
+
+// 1. Bare discard, mid-block.
+fn bareDiscard() -> Unit {
+    op()
+    other()
+}
+
+// 3. Bound, then never handled.
+fn boundUnhandled() -> Unit {
+    r = op()
+    other()
+}
+
+// 4. Overwrite before handling.
+fn overwriteBeforeHandling() -> Unit {
+    mut r = op()
+    r = op()
+    handle(r)
+}
+
+// 7. Only one branch handles.
+fn oneBranchHandles(flag: Bool) -> Unit {
+    r = op()
+    if flag {
+        handle(r)
+    }
+}
+
+// 9. Early return abandons another outstanding Result.
+fn earlyReturnAbandons(flag: Bool) -> Result<Int, E> {
+    first = op()
+    if flag {
+        return Ok(0)
+    }
+    handle(first)
+    op()
+}
+
+// 11. An ignored Result parameter.
+fn ignoredParameter(r: Result<Int, E>) -> Unit {
+}
+
+// 19. The obligation moved to the alias, so handling the source is not enough.
+fn aliasSourceHandled() -> Unit {
+    first = op()
+    second = first
+    handle(first)
+}
+
+// 20. A nested Result payload binding carries its own obligation.
+fn nestedInnerUnhandled() -> Unit {
+    outer = nested()
+    match outer {
+        Ok(inner) => {}
+        Err(_) => {}
+    }
+}
+
+// 23. A nullable Result left unhandled.
+fn nullableUnhandled(flag: Bool) -> Unit {
+    m = maybe(flag)
+    other()
+}
+
+// 23b. The present value carries its own obligation.
+fn nullablePresentUnhandled(flag: Bool) -> Unit {
+    m = maybe(flag)
+    match m {
+        null => {}
+        present => {}
+    }
+}
+
+// 24. `Ok` plus a wildcard does not discharge.
+fn okAndWildcard() -> Unit {
+    r = op()
+    match r {
+        Ok(_) => {}
+        _ => {}
+    }
+}
+
+// 25. A lone wildcard does not discharge.
+fn wildcardOnly() -> Unit {
+    r = op()
+    match r {
+        _ => {}
+    }
+}
+
+// 31. A Result created inside a branch is checked at that branch's scope exit.
+fn branchLocalUnhandled(flag: Bool) -> Unit {
+    if flag {
+        inner = op()
+        other()
+    }
+}
+
+export fn main() -> Unit {
+    print("unused")
+}

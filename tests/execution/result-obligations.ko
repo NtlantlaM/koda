@@ -1,0 +1,170 @@
+// Slice 2C: every way an accepted program may discharge a Result obligation
+// (ADR 0010). This file compiles and runs; the rejections live in
+// tests/types/result-obligations.ko.
+import { print } from "koda:io"
+
+enum E {
+    Bad
+}
+
+type Wrapper {
+    outcome: Result<Int, E>
+}
+
+enum Holder {
+    Holds(outcome: Result<Int, E>)
+    Nothing
+}
+
+fn op(flag: Bool) -> Result<Int, E> {
+    if flag {
+        Ok(1)
+    } else {
+        Err(E.Bad)
+    }
+}
+
+fn nested(flag: Bool) -> Result<Result<Int, E>, E> {
+    Ok(op(flag))
+}
+
+fn maybe(flag: Bool) -> Result<Int, E>? {
+    if flag {
+        Ok(2)
+    } else {
+        null
+    }
+}
+
+// 2. Explicit Ok/Err discharges.
+fn describe(r: Result<Int, E>) -> String {
+    match r {
+        Ok(n) => "ok {n}"
+        Err(_) => "err"
+    }
+}
+
+// 26. Both alternatives visible with ignored payloads still discharges.
+fn ignoredPayloads(r: Result<Int, E>) -> String {
+    match r {
+        Ok(_) => "ok"
+        Err(_) => "err"
+    }
+}
+
+// 12/13. A parameter may be handled or forwarded.
+fn forwarded(r: Result<Int, E>) -> Result<Int, E> {
+    r
+}
+
+// 5/30. Rebinding after discharge starts a fresh obligation.
+fn overwriteAfterHandling(flag: Bool) -> String {
+    mut r = op(flag)
+    first = describe(r)
+    r = op(flag)
+    second = describe(r)
+    first + "/" + second
+}
+
+// 6. Both branches handle.
+fn bothBranchesHandle(flag: Bool) -> String {
+    r = op(flag)
+    if flag {
+        describe(r)
+    } else {
+        describe(r)
+    }
+}
+
+// 8. One branch handles, the other transfers.
+fn handleOrTransfer(flag: Bool) -> Result<Int, E> {
+    r = op(flag)
+    if flag {
+        print(describe(r))
+    } else {
+        return r
+    }
+    op(true)
+}
+
+// 10. Early return transfers; the continuing path handles.
+fn earlyReturnTransfers(flag: Bool) -> Result<Int, E> {
+    first = op(flag)
+    if flag {
+        return first
+    }
+    print(describe(first))
+    op(true)
+}
+
+// 15/17. A local transfers through a call argument and through a return.
+fn localCallTransfer(flag: Bool) -> String {
+    r = op(flag)
+    describe(r)
+}
+
+fn localReturnTransfer(flag: Bool) -> Result<Int, E> {
+    r = op(flag)
+    r
+}
+
+// 18. An alias takes the obligation, and handling the alias discharges it.
+fn aliasTransfer(flag: Bool) -> String {
+    first = op(flag)
+    second = first
+    describe(second)
+}
+
+// 21. A nested Result's inner binding is handled in the arm.
+fn nestedInnerHandled(flag: Bool) -> String {
+    outer = nested(flag)
+    match outer {
+        Ok(inner) => describe(inner)
+        Err(_) => "outer error"
+    }
+}
+
+// 22. The two-step nullable shape.
+fn nullableHandled(flag: Bool) -> String {
+    m = maybe(flag)
+    match m {
+        null => "absent"
+        present => describe(present)
+    }
+}
+
+// 28/29. Storing into a record field and an enum payload transfers.
+fn storeInRecord(flag: Bool) -> String {
+    r = op(flag)
+    w = Wrapper { outcome: r }
+    describe(w.outcome)
+}
+
+fn storeInVariant(flag: Bool) -> String {
+    r = op(flag)
+    h = Holder.Holds(r)
+    match h {
+        Holder.Holds(inner) => describe(inner)
+        Holder.Nothing => "none"
+    }
+}
+
+export fn main() -> Unit {
+    // 14/16. Direct transfer through an argument and through a return.
+    print(describe(op(true)))
+    print(ignoredPayloads(op(false)))
+
+    print(describe(forwarded(op(true))))
+    print(overwriteAfterHandling(true))
+    print(bothBranchesHandle(true))
+    print(describe(handleOrTransfer(false)))
+    print(describe(earlyReturnTransfers(false)))
+    print(localCallTransfer(false))
+    print(describe(localReturnTransfer(true)))
+    print(aliasTransfer(true))
+    print(nestedInnerHandled(false))
+    print(nullableHandled(true))
+    print(nullableHandled(false))
+    print(storeInRecord(true))
+    print(storeInVariant(false))
+}

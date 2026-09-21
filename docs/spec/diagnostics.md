@@ -19,10 +19,12 @@ Suggested edits contain replacement text and exact spans. They are never applied
 | KODA-P0001 | Unexpected token | What was expected and where parsing can resume |
 | KODA-N0001 | Unresolved name | Scope and nearby plausible declarations |
 | KODA-T0001 | Type mismatch | Expected and actual types plus their origin |
-| KODA-T0002 | Unsafe nullable access | The nullable declaration and a match example |
+| KODA-T0002 | Unsafe nullable access | The nullable declaration, and a `match` or `x != null` example |
 | KODA-T0003 | Non-exhaustive match | Concrete missing variants |
 | KODA-T0004 | Reassignment to immutable binding | Declaration span and explicit `mut` option |
 | KODA-T0005 | Discarded Result expression | Handle, return, or bind the result |
+| KODA-T0012 | Outstanding Result leaving scope | Where it became outstanding, and how to discharge it |
+| KODA-T0013 | Overwrite of an outstanding Result | The earlier value, and handling it before reassigning |
 | KODA-M0001 | Module resolution failure | Import path and resolution policy |
 | KODA-F0001 | Foreign boundary failure | Binding and failed conversion |
 | KODA-U0001 | Unsupported feature | Feature status and supported subset |
@@ -37,7 +39,7 @@ error[KODA-T0004]: cannot assign to immutable binding 'count'
   --> src/main.ko:3:5
 3 |     count = count + 1
   |     ^^^^^ assignment requires a mutable binding
-note: 'count' was declared with 'let' at src/main.ko:2:5
+note: 'count' was declared without 'mut' at src/main.ko:2:5
 help: use 'mut count = 0' if reassignment is intentional
 ```
 
@@ -61,3 +63,23 @@ Float overflow to infinity, NaN results, and gradual underflow to signed zero ar
 Diagnostics use progressive disclosure: concise actionable rendering first, deterministic offline explanation second, and optional AI assistance third. The compiler remains authoritative. AI may explain structured diagnostics and propose context-aware repairs, but it cannot suppress an error, redefine validity, or be required for baseline Koda tooling.
 
 Mechanically safe edits must be classified by deterministic tooling rather than AI judgment. Exact diagnostic schema, final code registry, CLI commands, AI configuration/provider/privacy contracts, and patch-application UX remain Q07 decisions.
+
+## Slice 2A generic diagnostics
+
+Accepted Q11/Q01 rules require source-located errors for empty declaration
+parameter lists, duplicate parameters, primitive/prelude type-name collisions,
+unknown argument types, incorrect type arity, unapplied generics, arguments on
+nongeneric types, invariant mismatches and recursive data. Written `T??`
+continues to be a syntax error.
+
+The implementation reuses `KODA-P0001` for malformed lists, `KODA-N0001` for
+unknown types, `KODA-N0002` for duplicate/colliding parameters, `KODA-T0001`
+for type mismatches, and `KODA-U0001` for deferred constructs and recursion.
+`KODA-T0011` is a **candidate implementation code** for generic type-argument
+arity, including unapplied generic and nongeneric applications. Its diagnostics
+state expected/supplied counts for generics, reject arguments on nongeneric types, and reference the declaration when available.
+This adds no final Q07 registry decision.
+
+Generic functions, generic calls, generic construction and Result remain explicitly
+unsupported in this slice. Diagnostic text distinguishes those exclusions from
+supported generic data declarations; no suggestion invents a constructor syntax.

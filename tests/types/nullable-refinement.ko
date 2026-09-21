@@ -1,0 +1,90 @@
+// What refines and what does not (ADR 0007 follow-up). Every function here is
+// rejected: each one relies on a refinement Koda does not perform.
+import { print } from "koda:io"
+
+type Profile {
+    name: String
+    nickname: String?
+}
+
+fn needsString(text: String) -> String {
+    text
+}
+
+// A mutable local may be rebound, so it is not stable and does not refine.
+fn mutableLocalDoesNotRefine(profile: Profile) -> String {
+    mut nickname = profile.nickname
+    if nickname != null {
+        needsString(nickname)
+    } else {
+        "none"
+    }
+}
+
+// A property is an aliased location, not a stable binding.
+fn propertyDoesNotRefine(profile: Profile) -> String {
+    if profile.nickname != null {
+        needsString(profile.nickname)
+    } else {
+        "none"
+    }
+}
+
+// Refinement does not survive an intermediate Bool binding.
+fn intermediateBoolDoesNotRefine(nickname: String?) -> String {
+    present = nickname != null
+    if present {
+        needsString(nickname)
+    } else {
+        "none"
+    }
+}
+
+// `||` is not a source of refinement.
+fn orDoesNotRefine(a: String?, b: String?) -> String {
+    if a != null || b != null {
+        needsString(a)
+    } else {
+        "none"
+    }
+}
+
+// Negation is not a source of refinement.
+fn negationDoesNotRefine(nickname: String?) -> String {
+    if !(nickname == null) {
+        needsString(nickname)
+    } else {
+        "none"
+    }
+}
+
+// `&&` composes left to right, so the reversed order proves nothing about the
+// value used first.
+fn reversedOrderDoesNotRefine(nickname: String?) -> String {
+    if needsString(nickname) == "x" && nickname != null {
+        "yes"
+    } else {
+        "no"
+    }
+}
+
+// Early-return narrowing is deferred, so the binding stays nullable.
+fn earlyReturnDoesNotRefine(nickname: String?) -> String {
+    if nickname == null {
+        return "none"
+    }
+    needsString(nickname)
+}
+
+// The then branch of `==` learns nothing.
+fn equalsThenBranchDoesNotRefine(nickname: String?) -> String {
+    if nickname == null {
+        needsString(nickname)
+    } else {
+        "present"
+    }
+}
+
+export fn main() -> Unit {
+    print("unused")
+}

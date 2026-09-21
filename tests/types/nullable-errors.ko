@@ -1,0 +1,137 @@
+// Nullable typing: what a nullable value may and may not do
+// (ADR 0007, docs/spec/type-system.md).
+import { print } from "koda:io"
+
+type Profile {
+    name: String
+    nickname: String?
+}
+
+enum Mood {
+    Calm
+    Busy
+}
+
+fn needsString(text: String) -> String {
+    text
+}
+
+fn doubleNullable(text: String??) -> String {
+    text
+}
+
+fn nullableUnit(value: Unit?) -> Unit {
+    value
+}
+
+fn nullableToNonNull(nickname: String?) -> String {
+    nickname
+}
+
+fn nullPassedToNonNull() -> String {
+    needsString(null)
+}
+
+fn unconstrainedNull() -> String {
+    anything = null
+    needsString(anything)
+}
+
+fn unsafeUse(nickname: String?) -> String {
+    needsString(nickname)
+}
+
+fn unsafeInterpolation(nickname: String?) -> String {
+    "hello {nickname}"
+}
+
+fn unsafeFieldAccess(profile: Profile?) -> String {
+    profile.name
+}
+
+fn missingPresentArm(nickname: String?) -> String {
+    match nickname {
+        null => "none"
+    }
+}
+
+fn nullPatternOnNonNullable(mood: Mood) -> String {
+    match mood {
+        null => "none"
+        _ => "some"
+    }
+}
+
+fn bindingBeforeNull(nickname: String?) -> String {
+    match nickname {
+        value => "first"
+        null => "unreachable"
+    }
+}
+
+fn comparingNonNullable(text: String) -> String {
+    if text != null {
+        "present"
+    } else {
+        "absent"
+    }
+}
+
+fn bothSidesNull() -> String {
+    if null == null {
+        "a"
+    } else {
+        "b"
+    }
+}
+
+fn refinementResetsAtJoin(nickname: String?) -> String {
+    if nickname != null {
+        print(nickname)
+    }
+    needsString(nickname)
+}
+
+fn variantThroughNullable(mood: Mood?) -> String {
+    match mood {
+        null => "none"
+        Mood.Calm => "calm"
+        Mood.Busy => "busy"
+    }
+}
+
+type User {
+    handle: String
+}
+
+// Comparing a nullable against null is an absence test and is allowed...
+fn absenceTestIsAllowed(user: User?) -> String {
+    if user == null {
+        "absent"
+    } else {
+        "present"
+    }
+}
+
+// ...but it does not enable equality between two User values, which ADR 0007
+// still defers.
+fn derivedEqualityStillDeferred(a: User, b: User) -> String {
+    if a == b {
+        "same"
+    } else {
+        "different"
+    }
+}
+
+// Nor between two nullable Users.
+fn nullableDerivedEqualityStillDeferred(a: User?, b: User?) -> String {
+    if a == b {
+        "same"
+    } else {
+        "different"
+    }
+}
+
+export fn main() -> Unit {
+    print("unused")
+}

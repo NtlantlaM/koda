@@ -1,0 +1,14 @@
+ok 0
+bad x
+empty
+ok 1
+yes 0
+no
+ok 42
+empty
+ok 5
+bad z
+ok 7
+absent
+nested ok 9
+user Ada

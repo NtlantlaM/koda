@@ -1,0 +1,37 @@
+// ADR 0007/0011 Slice 2A: scoped parameters, substitution, invariant applications.
+type Box<T> { value: T }
+type Pair<K, V> { first: K, second: V }
+type Outer<A, B> { inner: Box<A>, other: B }
+type MaybeBox<T> { value: T? }
+enum Choice<T> { First(value: T), None }
+enum Wrapped<T> { Value(value: Box<T?>) }
+
+fn read(box: Box<Int>) -> Int { box.value }
+fn first(pair: Pair<String, Int>) -> String { pair.first }
+fn second(pair: Pair<String, Int>) -> Int { pair.second }
+fn nested(box: Box<Box<Int>>) -> Int { box.value.value }
+fn outer(value: Outer<Int, String>) -> Box<Int> { value.inner }
+fn nullableArgument(box: Box<Int?>) -> Int? { box.value }
+fn nullableOuter(box: Box<Int>?) -> Int {
+    match box { null => 0, present => present.value }
+}
+fn flatten(box: MaybeBox<Int?>) -> Int? { box.value }
+fn flattenNonNullable(box: MaybeBox<Int>) -> Int? { box.value }
+fn payload(choice: Choice<String>) -> String {
+    match choice { Choice.First(text) => text, Choice.None => "none" }
+}
+fn nestedPayload(wrapped: Wrapped<Int?>) -> Int? {
+    match wrapped { Wrapped.Value(box) => box.value }
+}
+fn pass(box: Box<Int>) -> Box<Int> { box }
+fn inferLocal(box: Box<Int>) -> Int {
+    local = pass(box)
+    annotated: Box<Int> = local
+    annotated.value
+}
+fn refine(box: Box<Int>?) -> Int {
+    local = box
+    if local != null { local.value } else { 0 }
+}
+fn outerInjection(box: Box<Int>) -> Box<Int>? { box }
+export fn main() -> Unit {}

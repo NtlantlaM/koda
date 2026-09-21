@@ -18,10 +18,18 @@ unsupported-feature diagnostic, so that building them did not answer any open
 question by accident. [Slice 1A](docs/implementation/slice-1a.md) adds `type`
 declarations, record construction, field access, and `enum` declarations with
 variants and payloads; [slice 1B](docs/implementation/slice-1b.md) adds
-`match` over enums, with payload patterns and exhaustiveness checking.
-Nullable types, generics, `Result`, multi-module programs and npm interop are
-**not** implemented, and matching is limited to enum values. There is no
-formatter, test runner or package manager. Some `examples/` programs use
+`match` over enums, with payload patterns and exhaustiveness checking; and
+[slice 1C](docs/implementation/slice-1c.md) adds nullable types, `null`,
+nullable matching and refinement by an explicit null check. [Slice 2A](docs/implementation/slice-2a.md)
+adds generic data declarations and type applications, and
+[slice 2B](docs/implementation/slice-2b.md) adds `Result<T, E>` values,
+constructors and matching, and
+[slice 2C](docs/implementation/slice-2c.md) enforces Result's must-handle rule:
+a Result may not be discarded, abandoned at a scope exit or overwritten before
+someone has looked at it. Generic
+construction, generic functions/calls/inference, multi-module programs and npm
+interop are **not** implemented. There
+is no formatter, test runner or package manager. Some `examples/` programs use
 constructs the slices do not cover; `examples/README.md` says which ones run.
 
 ## Start here
@@ -36,6 +44,10 @@ constructs the slices do not cover; `examples/README.md` says which ones run.
 - [Compiler slice 0 - the first executable slice](docs/implementation/slice-0.md)
 - [Compiler slice 1A - user-defined data](docs/implementation/slice-1a.md)
 - [Compiler slice 1B - match and enum patterns](docs/implementation/slice-1b.md)
+- [Compiler slice 1C - nullability](docs/implementation/slice-1c.md)
+- [Compiler slice 2A - generic data-type foundations](docs/implementation/slice-2a.md)
+- [Compiler slice 2B - Result values and matching](docs/implementation/slice-2b.md)
+- [Compiler slice 2C - Result must-handle analysis](docs/implementation/slice-2c.md)
 
 ## Repository map
 

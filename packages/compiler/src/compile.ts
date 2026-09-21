@@ -16,6 +16,7 @@ import { SourceFile, spanFrom } from "./source/source.js";
 import { tokenize } from "./syntax/lexer.js";
 import { parseModule } from "./syntax/parser.js";
 import { checkModule } from "./check/checker.js";
+import { checkObligations } from "./check/obligations.js";
 import { emitModule } from "./emit/js.js";
 
 /** Reads sources on the compiler's behalf; the CLI supplies the real one. */
@@ -84,6 +85,10 @@ function compileInternal(host: CompilerHost, options: CompileOptions, emit: bool
   const tokens = tokenize(file, diagnostics);
   const syntax = parseModule(file, tokens, diagnostics);
   const ir = checkModule(file.path, syntax, diagnostics);
+
+  // ADR 0010's must-handle rule is a separate pass over the typed IR. It runs
+  // only when ordinary checking succeeded, so every node it sees is real.
+  if (!diagnostics.hasErrors) checkObligations(ir, diagnostics);
 
   const all = sortDiagnostics(diagnostics.all);
   const ok = !hasErrors(all);

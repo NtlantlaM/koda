@@ -1,0 +1,149 @@
+// Result typing: contextual construction, payload types, matching and the
+// prelude-name protections (ADR 0010 follow-up, slice 2B).
+import { print } from "koda:io"
+
+enum ParseError {
+    Empty
+    Bad(text: String)
+}
+
+enum Other {
+    Only
+}
+
+fn takesResult(outcome: Result<Int, ParseError>) -> Int {
+    1
+}
+
+// Arity: Result takes exactly two arguments.
+fn tooFewArguments(outcome: Result<Int>) -> Int {
+    1
+}
+
+fn tooManyArguments(outcome: Result<Int, ParseError, Other>) -> Int {
+    1
+}
+
+fn noArguments(outcome: Result) -> Int {
+    1
+}
+
+// Unconstrained construction: nothing supplies the other side.
+fn unconstrainedOk() -> Int {
+    outcome = Ok(42)
+    1
+}
+
+fn unconstrainedErr() -> Int {
+    outcome = Err(ParseError.Empty)
+    1
+}
+
+// A non-Result expectation does not constrain a constructor either.
+fn wrongExpectation() -> Int {
+    Ok(42)
+}
+
+// Payload type must match the instantiated T / E.
+fn wrongOkPayload() -> Result<Int, ParseError> {
+    Ok("text")
+}
+
+fn wrongErrPayload() -> Result<Int, ParseError> {
+    Err("text")
+}
+
+fn wrongArity() -> Result<Int, ParseError> {
+    Ok(1, 2)
+}
+
+// Matching.
+fn missingErrArm(outcome: Result<Int, ParseError>) -> String {
+    match outcome {
+        Ok(n) => "ok"
+    }
+}
+
+fn missingOkArm(outcome: Result<Int, ParseError>) -> String {
+    match outcome {
+        Err(e) => "err"
+    }
+}
+
+fn duplicateArm(outcome: Result<Int, ParseError>) -> String {
+    match outcome {
+        Ok(n) => "a"
+        Ok(m) => "b"
+        Err(e) => "c"
+    }
+}
+
+fn unreachableAfterWildcard(outcome: Result<Int, ParseError>) -> String {
+    match outcome {
+        _ => "a"
+        Ok(n) => "b"
+    }
+}
+
+fn bindingShadowsAParameter(outcome: Result<Int, ParseError>, n: Int) -> String {
+    match outcome {
+        Ok(n) => "a"
+        Err(e) => "b"
+    }
+}
+
+// The qualified spelling is not a v0.1 form.
+fn qualifiedOk() -> Result<Int, ParseError> {
+    Result.Ok(1)
+}
+
+fn qualifiedErr() -> Result<Int, ParseError> {
+    Result.Err(ParseError.Empty)
+}
+
+// Unqualified patterns are the prelude form only; user enums stay qualified.
+fn unqualifiedUserVariant(value: Other) -> String {
+    match value {
+        Only => "only"
+    }
+}
+
+// A variant pattern may not reach through a nullable scrutinee.
+fn variantThroughNullableResult(outcome: Result<Int, ParseError>?) -> String {
+    match outcome {
+        null => "absent"
+        Ok(n) => "ok"
+        Err(e) => "err"
+    }
+}
+
+// An unqualified pattern WITH a payload is still the prelude form only.
+fn unqualifiedUserVariantWithPayload(value: ParseError) -> String {
+    match value {
+        Bad(text) => text
+        _ => "other"
+    }
+}
+
+// The prelude names are closed to user declarations.
+enum Result {
+    Mine
+}
+
+fn Ok() -> Int {
+    1
+}
+
+type Err {
+    field: Int
+}
+
+export fn main() -> Unit {
+    // ...and closed as pattern bindings.
+    outcome: Result<Int, ParseError> = Ok(1)
+    label = match outcome {
+        Ok(Err) => "a"
+        Err(e) => "b"
+    }
+    print(label)
+}

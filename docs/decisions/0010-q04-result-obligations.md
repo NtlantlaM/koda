@@ -64,6 +64,74 @@ Diagnostics use progressive disclosure: concise actionable output first, determi
 - AI integrations can evolve independently of language correctness.
 - Koda remains usable offline without AI.
 
+## Accepted follow-up details
+
+Approver: repository owner/user, by explicit instruction, 2026-09-21. This fills
+in a detail this decision left to integration; it supersedes nothing above.
+
+- **The prelude Result payload field names are `value` and `error`**, giving
+  `Ok(value: T)` and `Err(error: E)`. ADR 0008 had left "Q04/Q06 error names,
+  payloads and boundary wrapping" open; this settles the two field names only,
+  and chooses nothing about foreign error representation or boundary wrapping.
+
+- **Constructors are unqualified and positional**: `Ok(x)`, `Err(e)`.
+  `Result.Ok(...)` is not a v0.1 spelling.
+
+### Implementation staging
+
+Result is delivered in two slices. **Slice 2B** implements Result values,
+construction and matching. **Slice 2C** implements the must-handle obligation
+analysis this ADR requires. Both have landed.
+
+### 2026-09-21 - must-handle enforcement rules
+
+Approver: repository owner/user, by explicit Slice 2C authorization. These
+settle how the accepted obligation is enforced; they do not change what is
+owed.
+
+- **Discharge through `match` requires both alternatives to be visible.** A
+  match discharges a Result obligation only when its reachable arms explicitly
+  expose `Ok` and `Err`. `Ok(_)` and `Err(_)` qualify, because both
+  alternatives are named even though the payloads are deliberately ignored.
+  `Ok(value)` with a trailing `_`, and a lone `_`, do **not** discharge.
+  Exhaustiveness and obligation discharge are separate properties: a wildcard
+  may make a match exhaustive without making the failure visible.
+
+- **A Result parameter begins the function with an outstanding obligation.**
+  Otherwise a one-line function taking a Result and ignoring it would be the
+  reusable silent-discard escape this decision forbids.
+
+- **Binding an outstanding Result into another binding transfers it.** After
+  `second = first`, the responsibility belongs to `second`. Obligations are
+  never duplicated, shared, or prohibited from being copied, and no ownership
+  or borrowing machinery is introduced.
+
+- **An outstanding Result may not be overwritten.** Rebinding a `mut` Result
+  that has already been discharged is allowed and starts a fresh obligation.
+
+- **Obligations are checked at every scope exit**, not only at the end of a
+  function, and at every `return`.
+
+- **A binding whose own type is `Result<T, E>?` carries an obligation**,
+  discharged by the nullable match that exposes absence and presence. The
+  bound present value has direct Result type and so acquires its own
+  obligation.
+
+### Known enforcement limitation
+
+Enforcement tracks a binding whose **own** type is `Result<T, E>` or
+`Result<T, E>?`. Storing a Result into a record field or enum payload
+transfers the local obligation and tracking stops there, so a container
+holding an unhandled Result can currently be dropped without a diagnostic.
+
+**This is an implementation limitation, not a permitted discard.** This
+decision still requires that failure be handled; the compiler does not yet
+prove it in that position. Closing the gap needs obligation tracking through
+containers, which is deliberately outside the accepted slice boundary.
+
+Introducing loops will likewise require extending the analysis to a fixpoint;
+the current language has none.
+
 ## Deferrals
 
 - exact match/propagation syntax (Q01)

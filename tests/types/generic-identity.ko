@@ -1,0 +1,18 @@
+// ADR 0007: invariant arguments and nominal declarations, including phantom args.
+type Box<T> { value: T }
+type Other<T> { value: T }
+type MaybeBox<T> { value: T? }
+type Pair<A, B> { first: A, second: B }
+type Phantom<T> { value: Int }
+enum Choice<T> { Value(value: T), None }
+fn invariant(value: Box<Int>) -> Box<Int?> { value }
+fn nominal(value: Box<Int>) -> Other<Int> { value }
+fn normalizedFields(value: MaybeBox<Int>) -> MaybeBox<Int?> { value }
+fn position(value: Pair<Int, String>) -> Pair<String, Int> { value }
+fn phantom(value: Phantom<Int>) -> Phantom<String> { value }
+fn enumInvariant(value: Choice<Int>) -> Choice<Int?> { value }
+fn nullablePlacement(value: Box<Int>?) -> Box<Int?> { value }
+fn noMixedJoin(flag: Bool, a: Box<Int>, b: Box<Int?>) -> Unit {
+    value = if flag { a } else { b }
+}
+fn noNumericWidening(value: Box<Int>) -> Box<Float> { value }

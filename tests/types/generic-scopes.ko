@@ -1,0 +1,10 @@
+// Binders with the same name in different declarations are independent.
+type First<T> { value: T }
+type Second<T> { value: First<T> }
+type Named { value: Int }
+type Local<Named> { value: Named }
+type SelfNamed<SelfNamed> { value: SelfNamed }
+fn resolve(value: Second<String>) -> String { value.value.value }
+fn localWins(value: Local<String>) -> String { value.value }
+fn selfName(value: SelfNamed<Int>) -> Int { value.value }
+export fn main() -> Unit {}

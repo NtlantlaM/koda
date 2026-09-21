@@ -1,0 +1,18 @@
+// ADR 0007 Slice 2A: every type argument is explicit and arity is exact.
+type Box<T> { value: T }
+type Pair<A, B> { first: A, second: B }
+type Plain { value: Int }
+enum Choice<T> { Value(value: T) }
+type Bad {
+    missing: Box
+    empty: Box<>
+    few: Pair<Int>
+    many: Box<Int, String>
+    primitive: Int<String>
+    nongeneric: Plain<Int>
+    emptyNongeneric: Plain<>
+    unknownArgument: Box<Missing>
+    missingEnum: Choice
+    manyEnum: Choice<Int, String>
+}
+type AppliedParameter<T> { value: T<Int> }

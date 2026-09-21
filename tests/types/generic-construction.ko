@@ -1,0 +1,7 @@
+// Generic construction is deliberately excluded; expected types cannot infer it.
+type Box<T> { value: T }
+enum Choice<T> { Value(value: T), None }
+fn inferredRecord() -> Unit { value = Box { value: 1 } }
+fn contextualRecord() -> Box<Int> { Box { value: 1 } }
+fn enumPayload() -> Choice<Int> { Choice.Value(1) }
+fn enumEmpty() -> Choice<Int> { Choice.None }

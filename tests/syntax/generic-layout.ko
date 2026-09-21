@@ -1,0 +1,19 @@
+// ADR 0011 Slice 2A: nonempty, comma-separated, multiline parameter lists.
+type Multi<
+    A,
+    B,
+> { first: A, second: B }
+enum MultiEnum<
+    T,
+> { Value(value: T), Empty }
+type Box<T> { value: T }
+type Holder {
+    data: Multi<
+        Box<Int>,
+        String?,
+    >?
+}
+fn read(value: MultiEnum<Multi<Int, String>>) -> Int {
+    match value { MultiEnum.Value(pair) => pair.first, MultiEnum.Empty => 0 }
+}
+export fn main() -> Unit {}

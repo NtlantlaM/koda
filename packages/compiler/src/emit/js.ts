@@ -30,6 +30,7 @@ import type {
   IRFunction,
   IRMatch,
   IRModule,
+  IRNullableArm,
   IRStatement,
   LocalSymbol,
 } from "../ir/ir.js";
@@ -193,6 +194,10 @@ class Emitter {
       this.lowerMatch(expression, null);
       return;
     }
+    if (expression.kind === "nullable-match") {
+      this.lowerNullableMatch(expression, null);
+      return;
+    }
     if (expression.kind === "if") {
       const condition = this.lowerValue(expression.condition);
       this.push(`if (${condition}) {`);
@@ -258,7 +263,10 @@ class Emitter {
       case "field":
         return Emitter.needsStatements(expression.target);
       case "match":
+      case "nullable-match":
         return true;
+      case "null-test":
+        return Emitter.needsStatements(expression.operand);
       default:
         return false;
     }
@@ -376,7 +384,62 @@ class Emitter {
         return this.lowerIfValue(expression);
       case "match":
         return this.lowerMatchValue(expression);
+
+      case "null":
+        // Koda's absent value is JavaScript `null`; Unit is `undefined`, which
+        // keeps Unit and absence distinguishable. The layout is a Q08 question
+        // that is still unresolved; see docs/implementation/slice-1c.md.
+        return "null";
+      case "null-test":
+        return `(${this.lowerValue(expression.operand)} ${expression.negated ? "!==" : "==="} null)`;
+      case "nullable-match":
+        return this.lowerNullableMatchValue(expression);
     }
+  }
+
+  /**
+   * Lowers a nullable match. The scrutinee is bound once, as for an enum match,
+   * and the arms reduce to a single presence test.
+   */
+  private lowerNullableMatch(
+    expression: Extract<IRExpression, { kind: "nullable-match" }>,
+    target: string | null,
+  ): void {
+    const subject = this.bindTemp(this.lowerValue(expression.scrutinee));
+
+    const emitArm = (arm: IRNullableArm): void => {
+      if (arm.binding) this.push(`const ${jsName(arm.binding)} = ${subject};`);
+      if (target === null) this.emitBranchForEffect(arm.body);
+      else this.emitBranchInto(arm.body, target);
+    };
+
+    const nullArm = expression.arms.find((arm) => arm.test === "null");
+    const catchAll = expression.arms.find((arm) => arm.test === "catch-all");
+
+    if (!nullArm) {
+      // Only a catch-all: no test is needed at all.
+      if (catchAll) emitArm(catchAll);
+      return;
+    }
+
+    this.push(`if (${subject} === null) {`);
+    this.indent += 1;
+    emitArm(nullArm);
+    this.indent -= 1;
+    if (catchAll) {
+      this.push("} else {");
+      this.indent += 1;
+      emitArm(catchAll);
+      this.indent -= 1;
+    }
+    this.push("}");
+  }
+
+  private lowerNullableMatchValue(expression: Extract<IRExpression, { kind: "nullable-match" }>): string {
+    const temp = this.freshTemp();
+    this.push(`let ${temp};`);
+    this.lowerNullableMatch(expression, temp);
+    return temp;
   }
 
   /**

@@ -36,4 +36,22 @@ The accepted [Q03 decision](../docs/decisions/0009-q03-mutation-and-aliasing.md)
 The accepted [Q04 decision](../docs/decisions/0010-q04-result-obligations.md) adds future conformance obligations for reachable bare Result rejection, local Result abandonment/overwrite checks, explicit handling and transfer, deliberate-ignore visibility, and deterministic beginner-first diagnostics. Tests must also establish that baseline explanations and correctness do not require AI and that any mechanically safe edit classification comes from deterministic tooling.
 
 
+Slice 2C adds must-handle obligations: a bare discarded Result; a binding left unhandled at scope exit; overwrite before and after discharge; discharge requiring visible `Ok` and `Err` arms, with `Ok + _` and lone `_` failing to discharge; branch joins where one path handles and another does not; early return abandoning or transferring; Result parameters ignored, handled and forwarded; transfer through call arguments, returns, record construction and enum payloads; alias transfer; nested Result inner obligations; and the two-step nullable Result shape. The container-tracking limitation is documented rather than enforced.
+
+Slice 2B adds Result obligations: `Result<T, E>` application and arity; `Ok`/`Err` in annotated, tail, `return` and argument contexts, and under an expected `Result<T, E>?`; rejection of an unconstrained `Ok`/`Err`; payload type mismatches; exhaustive `Ok`/`Err` matching and missing, duplicate and wildcard arms; bindings that differ from `value`/`error`; no-shadowing on those bindings; rejection of `Result`, `Ok` and `Err` as user declarations and of `Result.Ok(...)`; nested applications; and the preserved boundary forbidding a direct variant pattern through a nullable Result. Must-handle enforcement is **not** covered here; it belongs to slice 2C.
+
+The accepted null-refinement follow-up to [Q11](../docs/decisions/0007-q11-type-boundaries.md) adds obligations: `T` accepted where `T?` is expected and the reverse rejected; `null` rejected for a non-nullable type and when unconstrained; written `T??` rejected; unsafe nullable use diagnosed; nullable `match` with a `null` arm and a binding arm, including the unreachable ordering; refinement by `x != null` and by the `else` of `x == null`; refinement of immutable locals and parameters but not of mutable locals, properties or arbitrary expressions; lexical lifetime with reset at an ordinary join; left-to-right `&&` composition including the reversed order that does not refine; and no refinement through `||`, negation or an intermediate Bool.
+
 The accepted [Q01 decision](../docs/decisions/0011-q01-concrete-syntax.md) adds future syntax fixtures for significant newlines and continuation, bare immutable versus `mut` bindings, tail expressions and bare-return line boundaries, record/control-head disambiguation, `f<T>(...)` generic calls versus comparison tokens, interpolation and multiline indentation, comments, ASCII identifier limits, match catch-alls/qualified variants, and accepted numeric literal forms. Parser tests must demonstrate that these decisions do not depend on symbol-table or AI intent.
+
+## Slice 2A coverage
+
+The [Slice 2A implementation](../docs/implementation/slice-2a.md) adds source
+checking fixtures for generic records/enums, declaration-local parameters,
+multi-parameter/multiline/trailing-comma declarations, nested and nullable
+applications, recursive substitution, invariant and nominal identity, arity,
+unknown names, duplicate/colliding parameters, finite nesting, recursion rejection,
+and unsupported generic values/functions/Result. Generic construction is deliberately
+absent; type-checking fixtures use annotations, nongeneric signatures, fields and
+payload descriptions rather than an invented value syntax. Existing execution
+fixtures continue to cover records, enums, matching, null refinement and numerics.

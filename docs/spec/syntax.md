@@ -1,18 +1,18 @@
-# Syntax specification proposal
+# Syntax specification
 
 > Q01 concrete syntax is **ACCEPTED** via [ADR 0011](../decisions/0011-q01-concrete-syntax.md). Later feature-specific syntax remains subject to its owning design question.
 
-Status: **EXPERIMENTAL** concrete syntax, pending Q01. The examples consistently use this proposal. This is a bounded grammar sketch, not yet a complete parser contract.
+Status: **ACCEPTED** Q01 surface rules and explicit follow-ups. The older grammar sketch is incomplete; accepted sections and ADR 0011 take precedence. Implementation subsets are recorded separately.
 
 ## Lexical and layout rules
 
-Proposed v0.1 rules: UTF-8 input; ASCII identifiers `[A-Za-z_][A-Za-z0-9_]*`; case-sensitive names; `//` line comments. Unicode is allowed in strings and comments. Unicode identifiers and block comments are LATER.
+Proposed v0.1 rules: UTF-8 input; ASCII identifiers `[A-Za-z_][A-Za-z0-9_]*`; case-sensitive names; `//` line comments. Unicode is allowed in strings and comments. Unicode identifiers and nested block comments are deferred; non-nesting block comments are accepted.
 
-The existing single-line proposal uses double quotes with `\n`, `\r`, `\t`, `\"`, and `\\` escapes. String interpolation and multiline strings are accepted by [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md). Q01 remains AWAITING DECISION for their delimiters, interpolation markers, escaping, and multiline indentation/newline rules; numeric formatting is fixed by [Q02](numbers.md); other interpolation conversion rules remain to be specified. The sketch below is incomplete for these accepted features and must not be treated as a frozen grammar. Q02 accepts decimal/binary/octal/hex integer magnitudes, digit separators, decimal-point/exponent Float forms, contextual literal typing, and direct negative-minimum formation. Their exact lexical/sign/parenthesis grammar remains Q01. [Numeric semantics](numbers.md) fixes ranges, rounding, and non-finite values; this grammar sketch does not override them. Decimal is reserved but unusable in v0.1; its reservation mechanism remains Q01.
+The existing single-line proposal uses double quotes with `\n`, `\r`, `\t`, `\"`, and `\\` escapes. String interpolation and multiline strings are accepted by [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md). ADR 0011 accepts interpolation braces and triple-quoted multiline strings; ADR 0011 specifies deterministic common-indentation removal; numeric formatting is fixed by [Q02](numbers.md); other interpolation conversion rules remain to be specified. The sketch below is incomplete for these accepted features and must not be treated as a frozen grammar. Q02 accepts decimal/binary/octal/hex integer magnitudes, digit separators, decimal-point/exponent Float forms, contextual literal typing, and direct negative-minimum formation. The accepted sign/parenthesis follow-up below governs direct negation; other lexical details remain subject to their recorded decisions. [Numeric semantics](numbers.md) fixes ranges, rounding, and non-finite values; this grammar sketch does not override them. Decimal is reserved but unusable in v0.1; its reservation mechanism remains Q01.
 
-Newlines terminate statements, except inside parentheses, brackets, and record/call argument lists. A binary operator at the end of a line continues its expression. Braces delimit blocks. Commas separate fields, parameters, arguments, variants, and match arms; trailing commas are allowed. Semicolons are not part of the proposal. Final block expressions supply a value; `return expression` exits a function early. Precise newline handling in nested braces must be formalized in Q01.
+Newlines terminate statements, except inside parentheses, brackets, and record/call argument lists. A binary operator at the end of a line continues its expression. Braces delimit blocks. Commas separate fields, parameters, arguments, variants, and match arms; trailing commas are allowed. Semicolons are not part of the proposal. Final block expressions supply a value; `return expression` exits a function early. Nested block braces restore statement context under ADR 0011.
 
-Proposed keywords: `as`, `else`, `entity`, `enum`, `export`, `false`, `fn`, `if`, `import`, `let`, `match`, `mut`, `null`, `return`, `true`, `type`. `entity` is reserved but unsupported in v0.1. `Result`, `Ok`, `Err`, and primitive type names are prelude names. Experimental concurrency and foreign declaration notation do not reserve additional v0.1 keywords yet.
+Proposed keywords: `as`, `else`, `entity`, `enum`, `export`, `false`, `fn`, `if`, `import`, `match`, `mut`, `null`, `return`, `true`, `type`. `entity` is reserved but unsupported in v0.1. `Result`, `Ok`, `Err`, and primitive type names are prelude names. Experimental concurrency and foreign declaration notation do not reserve additional v0.1 keywords yet.
 
 ## Declaration and expression sketch
 
@@ -34,7 +34,7 @@ pattern      = "_" | "null" | "true" | "false" | identifier
              | qualifiedVariant, [ "(", patterns, ")" ] ;
 ```
 
-`from` is a contextual token in imports. List productions, expression grammar, blocks, assignment restrictions, and identifier-versus-pattern resolution require completion before a parser is implemented. An identifier followed by `{` must be disambiguated between a record literal and the body of `if`/`match`; Q01 explicitly covers this.
+`from` is a contextual token in imports. This historical sketch omits details now supplied by ADR 0011 and the accepted follow-ups below, including record/control-head disambiguation, block values and pattern forms. Consult the implementation slice documents for the supported subset.
 
 ```ko
 type Person {
@@ -173,6 +173,76 @@ The positional payload *declaration* shown in the pre-Q01 grammar sketch earlier
 in this document was stale and has been corrected; the named form above is
 authoritative.
 
+### Nullable surface
+
+Accepted 2026-09-21. A nullable type is written `T?`, with the suffix following
+any type arguments, so a nullable list is `List<T>?`. Writing `T??` is rejected.
+The absent value is the literal `null`, which is an expression where a nullable
+type is expected and a pattern inside `match`:
+
+```ko
+type Profile {
+    name: String
+    nickname: String?
+}
+
+fn display(name: String?) -> String {
+    match name {
+        null => "Anonymous"
+        value => value
+    }
+}
+```
+
+An explicit null check is written `x != null` or `x == null`. Equality and
+inequality accept a nullable operand compared against `null`; that comparison is
+an **absence test** and does not enable equality for the underlying type. `?`
+remains a type suffix only, and no propagation operator is introduced.
+
+Which bindings a check refines, and for how long, is a Q11 matter recorded in
+[the type system](type-system.md#explicit-null-checks) and under "Accepted
+follow-up details" in [ADR 0007](../decisions/0007-q11-type-boundaries.md).
+
 ## Q01 accepted lexical/surface additions
 
 ADR 0011 accepts bare inferred immutable bindings, explicit `mut` rebinding declarations, braces with significant statement newlines, no required semicolons, final block values, `{expression}` string interpolation, triple-double-quoted multiline strings with deterministic common-indentation removal, `//` and non-nesting `/* ... */` comments, ASCII v0.1 identifiers in UTF-8 source, qualified user enum variants with prelude Ok/Err exceptions, and `_` catch-all patterns. Explicit generic calls use `f<T>(...)`; Rust-style turbofish is not Koda v0.1 syntax. Q04 uses explicit match/return handling; no propagation operator is in the initial syntax freeze.
+
+## Generic data-type syntax (Slice 2A)
+
+Status: **ACCEPTED**, explicit human clarification of Q01 on 2026-09-21.
+
+```ko
+type Pair<K, V> {
+    first: K
+    second: V
+}
+
+enum Choice<T> {
+    First(value: T)
+    None
+}
+
+type Triple<
+    A,
+    B,
+    C,
+> {
+    first: A
+    second: B
+    third: C
+}
+```
+
+Declaration parameter lists are nonempty, comma-separated, optionally trailing
+comma, and multiline. `type Box<>` is invalid. Parameters occur directly after
+the declaration name. No default parameters or bounds are introduced.
+
+Type arguments are type descriptions, so `Pair<String, Int>`,
+`Outer<Inner<Int>, String>`, `Box<Int?>` and `Box<Int>?` are type references.
+The type-reference parser handles nested angle brackets; it does not parse them
+as value comparisons. Empty/omitted/partial arguments and arguments on nongeneric
+types are rejected. Exact arity and declaration-local names are Q11 semantics.
+
+This type syntax does not introduce generic record/enum construction syntax.
+Generic functions and explicit `f<T>(...)` calls remain outside Slice 2A;
+accepted future calls must not be silently reinterpreted as comparison chains.

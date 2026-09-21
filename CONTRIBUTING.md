@@ -8,7 +8,7 @@ A design proposal should identify a concrete problem, show a small `.ko` example
 
 Use ACCEPTED, EXPERIMENTAL, LATER, or REJECTED for feature maturity as defined in the status register. Mark every unresolved design choice AWAITING DECISION separately; recommendations require explicit approval before they become decisions. Contributors may propose status changes; changing an accepted decision requires a reviewed ADR that supersedes the old decision. Keep the register, specifications, roadmap, and examples consistent in the same change.
 
-Examples currently demonstrate design intent only. Do not describe a proposal as implemented or tested by a compiler unless [compiler slice 0](docs/implementation/slice-0.md) covers it; that document is the only record of what runs today.
+Examples include executable subsets and future design targets; [their index](examples/README.md) distinguishes them. Do not describe a proposal as implemented or tested by a compiler unless the relevant [implementation slice](docs/README.md) covers it; each slice records its supported subset.
 
 Stage 0's blocking decisions are still open. Slice 0 exists because it stays inside already-accepted decisions and excludes every construct Q05-Q08 govern. Extending the implementation into those areas still requires resolving them first, and no implementation choice made under duress becomes a decision: record such choices in the slice document, not in an ADR.
 

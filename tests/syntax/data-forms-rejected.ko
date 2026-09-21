@@ -1,4 +1,4 @@
-// Forms this slice does not accept, each with its own explanation.
+// Rejected forms plus generic declarations accepted since Slice 2A.
 import { print } from "koda:io"
 
 type User {

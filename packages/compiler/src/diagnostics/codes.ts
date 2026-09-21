@@ -21,8 +21,12 @@ export const Codes = {
   TypeMismatch: "KODA-T0001",
   /** Non-exhaustive match; docs/spec/diagnostics.md. */
   NonExhaustiveMatch: "KODA-T0003",
+  /** Unsafe nullable access; docs/spec/diagnostics.md. */
+  UnsafeNullable: "KODA-T0002",
   /** Reassignment to an immutable binding; docs/spec/diagnostics.md. */
   ImmutableAssignment: "KODA-T0004",
+  /** Discarded Result expression; docs/spec/diagnostics.md. */
+  DiscardedResult: "KODA-T0005",
   /** CANDIDATE. Wrong number of call arguments. */
   ArgumentCount: "KODA-T0006",
   /** CANDIDATE. Numeric literal cannot inhabit its selected type; required by ADR 0008. */
@@ -33,6 +37,12 @@ export const Codes = {
   UnknownMember: "KODA-T0009",
   /** CANDIDATE. A match arm can never be reached. */
   UnreachableArm: "KODA-T0010",
+  /** CANDIDATE. Wrong number of type arguments, including an unapplied generic. */
+  TypeArgumentCount: "KODA-T0011",
+  /** CANDIDATE. An outstanding Result leaves its scope unhandled. */
+  OutstandingResult: "KODA-T0012",
+  /** CANDIDATE. An outstanding Result is overwritten before being handled. */
+  OverwrittenResult: "KODA-T0013",
   /** Module resolution failure; docs/spec/diagnostics.md. */
   ModuleResolution: "KODA-M0001",
   /** Unsupported feature; docs/spec/diagnostics.md. */

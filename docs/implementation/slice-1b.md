@@ -5,6 +5,8 @@
 > language behaviour, implementation detail, provisional choices, deferrals and
 > open ambiguities are kept in separate sections on purpose.
 
+[Slice 1C](slice-1c.md) builds on this one by adding nullability.
+
 Slice 1B makes the enum values from [slice 1A](slice-1a.md) inspectable. It adds
 `match` expressions, qualified variant patterns, positional payload patterns,
 pattern-local bindings, the `_` catch-all, exhaustiveness checking, unreachable

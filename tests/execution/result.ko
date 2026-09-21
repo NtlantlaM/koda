@@ -1,0 +1,116 @@
+// Slice 2B: Result values and matching. Result is an ordinary generic enum
+// with prelude constructors, so construction, substitution, patterns and
+// exhaustiveness all reuse the existing machinery (ADR 0010 follow-up).
+import { print } from "koda:io"
+
+enum ParseError {
+    Empty
+    Bad(text: String)
+}
+
+type User {
+    name: String
+}
+
+// B: function final-expression context.
+fn parse(text: String) -> Result<Int, ParseError> {
+    if text == "" {
+        Ok(0)
+    } else {
+        Err(ParseError.Bad(text))
+    }
+}
+
+// C: explicit return context, both constructors.
+fn strict(text: String) -> Result<Int, ParseError> {
+    if text == "" {
+        return Err(ParseError.Empty)
+    }
+    return Ok(1)
+}
+
+// Ok binds T, Err binds E; binding names differ from value/error.
+fn describe(outcome: Result<Int, ParseError>) -> String {
+    match outcome {
+        Ok(n) => "ok {n}"
+        Err(problem) =>
+            match problem {
+                ParseError.Empty => "empty"
+                ParseError.Bad(t) => "bad {t}"
+            }
+    }
+}
+
+// Discharging a Result obligation needs both alternatives visible, so a
+// wildcard is not enough even though it would make the match exhaustive.
+fn succeeded(outcome: Result<Int, ParseError>) -> String {
+    match outcome {
+        Ok(n) => "yes {n}"
+        Err(_) => "no"
+    }
+}
+
+// D: function argument context.
+fn consume(outcome: Result<Int, ParseError>) -> String {
+    describe(outcome)
+}
+
+// Nullable expected context: one outer wrapper is looked through.
+fn maybe(flag: Bool) -> Result<Int, ParseError>? {
+    if flag {
+        Ok(7)
+    } else {
+        null
+    }
+}
+
+// Nested applications, and a record payload.
+fn wrap(outcome: Result<Int, ParseError>) -> Result<Result<Int, ParseError>, ParseError> {
+    Ok(outcome)
+}
+
+fn loadUser(name: String) -> Result<User, ParseError> {
+    Ok(User { name: name })
+}
+
+export fn main() -> Unit {
+    print(describe(parse("")))
+    print(describe(parse("x")))
+    print(describe(strict("")))
+    print(describe(strict("y")))
+
+    print(succeeded(parse("")))
+    print(succeeded(parse("x")))
+
+    // Argument context, constructed inline.
+    print(consume(Ok(42)))
+    print(consume(Err(ParseError.Empty)))
+
+    // A: annotated binding context.
+    annotated: Result<Int, ParseError> = Ok(5)
+    print(describe(annotated))
+
+    failed: Result<Int, ParseError> = Err(ParseError.Bad("z"))
+    print(describe(failed))
+
+    // A nullable Result is handled by resolving absence first.
+    match maybe(true) {
+        null => print("absent")
+        present => print(describe(present))
+    }
+    match maybe(false) {
+        null => print("absent")
+        present => print(describe(present))
+    }
+
+    // Nested Result application.
+    match wrap(Ok(9)) {
+        Ok(inner) => print("nested " + describe(inner))
+        Err(_) => print("nested error")
+    }
+
+    match loadUser("Ada") {
+        Ok(user) => print("user {user.name}")
+        Err(_) => print("no user")
+    }
+}

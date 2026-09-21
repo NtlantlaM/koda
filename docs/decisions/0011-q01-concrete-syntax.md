@@ -93,6 +93,24 @@ This also settles how to read the pre-Q01 grammar sketch, which showed a
 positional payload declaration: that sketch was stale, and the named form above
 is authoritative.
 
+- **Nullable surface.** A nullable type is written `T?`, the suffix following
+  any type arguments. The absent value is the literal `null`, usable as an
+  expression where a nullable type is expected and as a pattern. An explicit
+  null check is written `x != null` or `x == null`. Written `T??` remains
+  rejected, as [ADR 0007](0007-q11-type-boundaries.md) requires.
+
+  ```koda
+  fn display(name: String?) -> String {
+      match name {
+          null => "Anonymous"
+          value => value
+      }
+  }
+  ```
+
+  The semantics of the check, and which bindings it refines, belong to Q11 and
+  are recorded under "Accepted follow-up details" in ADR 0007.
+
 Everything else listed under Deferrals below remains deferred.
 
 ## Deferrals
@@ -105,3 +123,26 @@ Everything else listed under Deferrals below remains deferred.
 - expression-bodied function shorthand
 - exact entity syntax beyond the reserved word
 - future concurrency/foreign declaration syntax
+
+## 2026-09-21 — accepted Slice 2A generic data syntax
+
+Approver: repository owner/user, by explicit Slice 2A implementation authorization.
+
+Generic data declarations use `type Box<T> { value: T }` and
+`enum Choice<T> { First(value: T), None }`. Parameters immediately follow
+the declaration name in angle brackets; lists are nonempty, comma-separated,
+allow a trailing comma, and may span lines. Duplicate/colliding parameter names
+follow Q11's accepted Slice 2A rules.
+
+Type positions allow fully applied types such as `Pair<String, Int>`,
+`Outer<Inner<Int>, String>`, `Box<Int?>`, and `Box<Int>?`. Nested argument
+syntax is recursive; the nullable suffix follows the complete application.
+Applications must supply exactly the declaration's arity; empty, omitted and
+partial applications are invalid, as are arguments on nongeneric types.
+Written `T??` remains invalid.
+
+These rules do not accept generic value construction. Neither
+`Box<Int> { value: 42 }` nor contextual constructor inference is selected.
+Generic functions and `f<T>(...)` calls retain their accepted future spelling
+but are not implemented in Slice 2A. No temporary constructor or call syntax is
+introduced. See [the syntax specification](../spec/syntax.md#generic-data-type-syntax-slice-2a).
