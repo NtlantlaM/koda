@@ -51,41 +51,50 @@ export function integerMagnitude(raw: string): bigint | null {
 }
 
 /**
- * Exact value of a decimal Float numeral as `mantissa * 10 ** exponent`.
- * No binary rounding happens here.
+ * Exact decimal digits and scale. Keep the mantissa as text so Float selection
+ * and range checks do not allocate a huge integer. The exponent is exact too;
+ * no host Number/Infinity or expanded power of ten participates in Int typing.
  */
-export function decimalParts(raw: string): { mantissa: bigint; exponent: number } | null {
+export function decimalParts(raw: string): { mantissa: string; exponent: bigint } | null {
   const text = stripSeparators(raw);
   const match = /^([0-9]*)(?:\.([0-9]*))?(?:[eE]([+-]?[0-9]+))?$/.exec(text);
   if (!match) return null;
   const whole = match[1] ?? "";
   const fraction = match[2] ?? "";
-  const exponent = match[3] ? Number.parseInt(match[3], 10) : 0;
+  const exponent = match[3] ? BigInt(match[3]) : 0n;
   if (whole === "" && fraction === "") return null;
   const digits = `${whole}${fraction}`;
-  return { mantissa: BigInt(digits === "" ? "0" : digits), exponent: exponent - fraction.length };
+  return { mantissa: digits.replace(/^0+/, "") || "0", exponent: exponent - BigInt(fraction.length) };
 }
 
-/** Exact integer value of a numeral, or null when it is not an integer. */
-function exactInteger(raw: string, category: "int" | "float"): bigint | null {
-  if (category === "int") return integerMagnitude(raw);
+/** Select a small exact magnitude without ever expanding a source-sized power. */
+function decimalIntMagnitude(raw: string): NumeralResult<bigint> {
   const parts = decimalParts(raw);
-  if (!parts) return null;
-  if (parts.exponent >= 0) return parts.mantissa * 10n ** BigInt(parts.exponent);
-  const divisor = 10n ** BigInt(-parts.exponent);
-  if (parts.mantissa % divisor !== 0n) return null;
-  return parts.mantissa / divisor;
+  if (!parts) return { ok: false, reason: { kind: "malformed" } };
+  let digits = parts.mantissa;
+  if (digits === "0") return { ok: true, value: 0n };
+  let exponent = parts.exponent;
+  if (exponent < 0n) {
+    let end = digits.length;
+    while (end > 0 && digits[end - 1] === "0") end -= 1;
+    const zeros = digits.length - end;
+    const remove = -exponent;
+    if (remove > BigInt(zeros)) return { ok: false, reason: { kind: "not-integral" } };
+    // Conversion is safe only after proving this count fits inside the source.
+    digits = digits.slice(0, digits.length - Number(remove));
+    exponent = 0n;
+  }
+  if (BigInt(digits.length) + exponent > 19n) return { ok: false, reason: { kind: "int-range" } };
+  // At most 19 result digits; the ordinary signed check below handles the edge.
+  return { ok: true, value: BigInt(digits) * 10n ** exponent };
 }
 
 /** Selects an Int value for a numeral, applying a direct negation if present. */
 export function numeralAsInt(raw: string, category: "int" | "float", negated: boolean): NumeralResult<bigint> {
-  const magnitude = exactInteger(raw, category);
-  if (magnitude === null) {
-    // Distinguish "1.5 is not an integer" from a malformed numeral.
-    const reason: NumeralRejection =
-      category === "float" && decimalParts(raw) !== null ? { kind: "not-integral" } : { kind: "malformed" };
-    return { ok: false, reason };
-  }
+  const selected = category === "float" ? decimalIntMagnitude(raw) : null;
+  if (selected && !selected.ok) return selected;
+  const magnitude = selected?.ok ? selected.value : integerMagnitude(raw);
+  if (magnitude === null) return { ok: false, reason: { kind: "malformed" } };
   // A negative floating zero cannot be retargeted to Int: that loses its sign.
   if (category === "float" && negated && magnitude === 0n) {
     return { ok: false, reason: { kind: "negative-zero-as-int" } };
@@ -131,5 +140,5 @@ export function numeralAsFloat(raw: string, category: "int" | "float", negated: 
 export function underflowedToZero(raw: string, value: number): boolean {
   if (value !== 0) return false;
   const parts = decimalParts(raw);
-  return parts !== null && parts.mantissa !== 0n;
+  return parts !== null && parts.mantissa !== "0";
 }

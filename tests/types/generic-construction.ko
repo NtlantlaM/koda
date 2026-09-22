@@ -1,7 +1,52 @@
-// Generic construction is deliberately excluded; expected types cannot infer it.
+// Slice 3A: type arguments come from the construction site or an expected type,
+// never from a field or payload value. Every function holds one rejection.
 type Box<T> { value: T }
-enum Choice<T> { Value(value: T), None }
-fn inferredRecord() -> Unit { value = Box { value: 1 } }
-fn contextualRecord() -> Box<Int> { Box { value: 1 } }
-fn enumPayload() -> Choice<Int> { Choice.Value(1) }
-fn enumEmpty() -> Choice<Int> { Choice.None }
+type Pair<A, B> { left: A, right: B }
+type Plain { n: Int }
+type MaybeBox<T> { value: T? }
+enum Wrap<T> { Has(value: T), None }
+enum Choice { Only }
+
+fn unconstrainedRecord() -> Unit { value = Box { value: 42 } }
+
+fn unconstrainedEnum() -> Unit { value = Wrap.Has(42) }
+
+fn unconstrainedEmptyVariant() -> Unit { value = Wrap.None }
+
+fn emptyArguments() -> Unit { value = Box<> { value: 42 } }
+
+fn tooManyArguments() -> Unit { value = Box<Int, String> { value: 42 } }
+
+fn tooFewArguments() -> Unit { value = Pair<Int> { left: 1, right: 2 } }
+
+fn argumentsOnNongenericRecord() -> Unit { value = Plain<Int> { n: 1 } }
+
+fn argumentsOnNongenericEnum() -> Unit { value = Choice<Int>.Only }
+
+fn unknownArgumentName() -> Unit { value = Box<Nope> { value: 1 } }
+
+fn explicitDisagreesWithContext() -> Box<String> { Box<Int> { value: 42 } }
+
+fn explicitEnumDisagreesWithContext() -> Wrap<String> { Wrap<Int>.Has(42) }
+
+fn instantiatedFieldMismatch() -> Box<String> { Box<String> { value: 42 } }
+
+fn instantiatedPayloadMismatch() -> Wrap<String> { Wrap<String>.Has(42) }
+
+fn contextualFieldMismatch() -> Box<String> { Box { value: 42 } }
+
+fn missingField() -> Pair<Int, Int> { Pair<Int, Int> { left: 1 } }
+
+fn unknownField() -> Box<Int> { Box<Int> { value: 1, extra: 2 } }
+
+fn duplicateField() -> Box<Int> { Box<Int> { value: 1, value: 2 } }
+
+fn payloadArity() -> Wrap<Int> { Wrap<Int>.Has(1, 2) }
+
+fn payloadOnEmptyVariant() -> Wrap<Int> { Wrap<Int>.None(1) }
+
+fn unitBoundaryAtConstruction() -> Unit { value = MaybeBox<Unit> { value: null } }
+
+fn wrongDeclarationExpected() -> Pair<Int, Int> { Box { value: 1 } }
+
+fn nestedContextualUnconstrained() -> Box<Int> { Box<Int> { value: Box { value: 1 } } }

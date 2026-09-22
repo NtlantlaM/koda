@@ -1,0 +1,39 @@
+// Slice 4A: type arguments are always written, and an unconstrained type
+// parameter has no capabilities. One rejection per function.
+type Box<T> { value: T }
+fn identity<T>(x: T) -> T { x }
+fn choose<T>(a: T, b: T) -> Pair2<T, T> { Pair2<T, T> { first: a, second: b } }
+type Pair2<A, B> { first: A, second: B }
+fn add(a: Int, b: Int) -> Int { a + b }
+
+fn noTypeArguments() -> Unit { v = identity(42) }
+
+fn emptyTypeArguments() -> Unit { v = identity<>(42) }
+
+fn tooManyTypeArguments() -> Unit { v = identity<Int, String>(42) }
+
+fn typeArgumentsOnNonGeneric() -> Unit { v = add<Int>(1, 2) }
+
+fn unknownTypeArgument() -> Unit { v = identity<Nope>(1) }
+
+fn substitutedArgumentMismatch() -> Unit { v = choose<Int>(1, "two") }
+
+fn arithmeticOnAbstract<T>(x: T) -> T { x + x }
+
+fn equalityOnAbstract<T>(a: T, b: T) -> Bool { a == b }
+
+fn orderingOnAbstract<T>(a: T, b: T) -> Bool { a < b }
+
+fn fieldOnAbstract<T>(x: T) -> Int { x.value }
+
+fn interpolationOnAbstract<T>(x: T) -> String { "{x}" }
+
+fn duplicateTypeParameter<T, T>(x: T) -> T { x }
+
+fn reservedResultName<Result>(x: Result) -> Result { x }
+
+fn reservedOkName<Ok>(x: Ok) -> Ok { x }
+
+fn reservedPrimitiveName<Int>(x: Int) -> Int { x }
+
+fn parameterEscapesItsFunction(x: T) -> Box<Int> { Box<Int> { value: 1 } }

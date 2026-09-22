@@ -217,3 +217,9 @@ npm test
 
 node packages/cli/dist/src/main.js run tests/execution/result-obligations.ko
 ```
+
+## Historical boundary after Slice 3B authorization
+
+The container limitation above describes Slice 2C, not permitted language
+behaviour. [Slice 3B](slice-3b.md) implements the accepted structural extension,
+including wildcard/temporary preservation and conditional execution corrections.

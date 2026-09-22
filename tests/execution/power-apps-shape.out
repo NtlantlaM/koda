@@ -1,0 +1,7 @@
+Inspection has 3 screens
+Home (2)
+  Title: Label
+  Start: Button
+Details (1)
+  Notes: TextInput
+Empty (0)

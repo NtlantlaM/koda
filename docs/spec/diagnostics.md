@@ -80,6 +80,70 @@ arity, including unapplied generic and nongeneric applications. Its diagnostics
 state expected/supplied counts for generics, reject arguments on nongeneric types, and reference the declaration when available.
 This adds no final Q07 registry decision.
 
-Generic functions, generic calls, generic construction and Result remain explicitly
-unsupported in this slice. Diagnostic text distinguishes those exclusions from
-supported generic data declarations; no suggestion invents a constructor syntax.
+### Generic functions (Slice 4A)
+
+Generic functions and calls introduce no new code. `KODA-N0002` covers a
+duplicate or reserved type-parameter name. `KODA-T0011` covers a missing,
+empty, or wrongly counted type-argument list, and type arguments written on a
+function that declares none; its message states that Koda requires them to be
+written and never offers inference as the fix. `KODA-T0001` covers an argument
+that does not match its **substituted** parameter type — the message names the
+substituted type, never the type parameter — and an operation an unconstrained
+type parameter does not support, worded so it does not imply that a constraints
+feature exists. `KODA-U0001` still covers bounds, defaults and variance.
+
+`KODA-T0012` covers an abstract type-parameter responsibility left outstanding.
+Its notes explain that the value's type is an unconstrained type parameter, so
+Koda cannot tell whether it holds an outcome, and that the function must hand
+it onward. It does **not** suggest matching the value, because an abstract type
+parameter cannot be matched.
+
+No diagnostic exposes a declaration identity, an owner id, an internal module
+id, or obligation implementation vocabulary.
+
+### Lists and iteration (Slice 5)
+
+Lists introduce no new code. `KODA-T0001` covers a literal element that does not
+match the element type (naming the first element's span as the origin when the
+type came from there), an empty `[]` with no expected type, a non-list iterated
+by `for`, and a non-Int index. `KODA-T0011` covers wrong `List` arity.
+`KODA-N0002` covers a loop binding that shadows, and a user declaration of the
+closed `List` name. `KODA-T0009` covers an unknown operation on a list.
+`KODA-U0001` covers `break` and `continue`, which remain deferred.
+
+`KODA-T0012` covers a list whose elements were never accounted for: never
+iterated, iterated with the binding ignored, read only through `get`,
+or abandoned by an early `return` from the loop. Structural paths render the
+collective element as `[]`, so a nested case reads `results[].value`.
+
+An empty-literal diagnostic states that Koda cannot know the element type and
+does not invent one; it offers an annotation, a return type or a parameter
+position, and never offers inference.
+
+Generic functions and generic calls were previously unsupported. Diagnostic
+text distinguishes those exclusions from supported generic data declarations and
+construction; no suggestion invents a call or inference syntax.
+
+### Generic construction (Slice 3A)
+
+Construction reuses the codes above and introduces none of its own.
+`KODA-T0011` covers a wrong argument count at a construction site, an empty
+`Box<>`, and arguments written on a nongeneric type. `KODA-T0001` covers a
+construction with no complete expected type, written arguments that disagree
+with the context, and a value that does not match its **instantiated** field or
+payload type. `KODA-T0008`, `KODA-T0009` and `KODA-T0006` keep their existing
+meanings for missing fields, unknown members and payload arity.
+
+An unconstrained construction states that nothing names the type arguments,
+offers both remedies — writing them, or supplying a context — and says plainly
+that Koda does not infer an argument from a field's value. No suggestion
+proposes inference as a fix.
+
+## Slice 3B structural responsibility diagnostics
+
+KODA-T0005 covers discarded Result-bearing expressions and temporary residuals,
+including nullable Result calls. KODA-T0012 covers outstanding structural paths
+at scope exit/return; KODA-T0013 covers old-generation paths on replacement.
+Name paths such as p.second, include origins and useful wildcard/projection
+locations, and report each responsibility once in deterministic order. Existing
+code/schema status remains provisional under Q07. No new code is required.

@@ -1,0 +1,52 @@
+// Slice 4A + ADR 0010: an unconstrained type parameter carries an opaque
+// responsibility. It can be handed on, never handled. These are the adversarial
+// cases from the readiness investigation; each function holds one rejection.
+type Box<T> { value: T }
+type Pair<A, B> { first: A, second: B }
+type Phantom<T> { }
+enum Option<T> { None, Some(value: T) }
+
+// B. The escape this rule exists to close. Without it,
+// `ignore<Result<Int, String>>(operation())` would discard a failure silently.
+fn ignore<T>(x: T) -> Unit { }
+
+// E. Overwriting an abstract responsibility before handing the old one on.
+fn replace<T>(x: T, y: T) -> T {
+    mut held = x
+    held = y
+    held
+}
+
+// Two abstract responsibilities in, one out: the other is abandoned.
+fn dropSecond<T>(a: T, b: T) -> T { a }
+
+// Reading only part of a pair abandons the rest.
+fn firstOfPair<T>(p: Pair<T, T>) -> T { p.first }
+
+// Inspecting a generic enum and returning a summary abandons the payload.
+fn summarise<T>(option: Option<T>) -> Bool {
+    match option {
+        Option.Some(inner) => true
+        Option.None => false
+    }
+}
+
+// F. Nested: the container's stored member carries it.
+fn dropNested<T>(b: Box<Box<T>>) -> Unit { }
+
+// G. Nullable: the present alternative carries it.
+fn dropNullable<T>(v: T?) -> Unit { }
+
+// A binding inside a body is accounted for exactly like a parameter.
+fn dropLocal<T>(x: T) -> Unit {
+    held = x
+}
+
+// Accepted, and deliberately present here as the boundary of the rule:
+// responsibility flows only through stored members, so a Phantom carries none
+// even when instantiated at a Result, and identity hands its T straight back.
+fn phantomCarriesNothing<T>(p: Phantom<T>) -> Unit { }
+
+fn identityHandsItOn<T>(x: T) -> T { x }
+
+fn storedThenReturned<T>(x: T) -> Box<T> { Box<T> { value: x } }

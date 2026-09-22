@@ -505,16 +505,9 @@ export class Parser {
     }
     const nameToken = this.advance();
 
-    if (this.isPunct("<")) {
-      this.unsupported(
-        "generic function declarations are not available in this compiler slice",
-        this.current.span,
-        "type parameters are not supported yet",
-        [
-          "Slice 2A implements generic data declarations, not generic functions",
-          "see docs/implementation/slice-0.md for the supported subset",
-        ],
-      );
+    // Slice 4A: the same list a data declaration uses.
+    const typeParameters = this.parseTypeParameters();
+    if (!typeParameters) {
       this.skipDeclaration();
       return null;
     }
@@ -564,6 +557,7 @@ export class Parser {
       exported,
       name: nameToken.text,
       nameSpan: nameToken.span,
+      typeParameters,
       parameters,
       returnType,
       body,
@@ -583,6 +577,29 @@ export class Parser {
     return { name: nameToken.text, nameSpan: nameToken.span, type };
   }
 
+  /**
+   * `<A, B>` after a type name. Shared by type positions and, since Slice 3A,
+   * by construction sites, so both spell their arguments identically. An empty
+   * `<>` yields an empty list, which the checker rejects as an arity error.
+   */
+  private parseTypeArgumentList(): { arguments: TypeRef[]; end: Span } | null {
+    this.advance();
+    this.skipNewlines();
+    const argumentsList: TypeRef[] = [];
+    while (!this.isPunct(">") && !this.atEnd) {
+      const argument = this.parseTypeRef();
+      if (!argument) return null;
+      argumentsList.push(argument);
+      this.skipNewlines();
+      if (!this.isPunct(",")) break;
+      this.advance();
+      this.skipNewlines();
+    }
+    const close = this.expectPunct(">", "to close the type arguments");
+    if (!close) return null;
+    return { arguments: argumentsList, end: close.span };
+  }
+
   private parseTypeRef(): TypeRef | null {
     if (this.current.kind !== "identifier") {
       this.error("expected a type name", this.current.span, `found ${this.describe(this.current)}`);
@@ -592,21 +609,10 @@ export class Parser {
     let argumentsList: TypeRef[] | null = null;
     let end = token.span;
     if (this.isPunct("<")) {
-      this.advance();
-      this.skipNewlines();
-      argumentsList = [];
-      while (!this.isPunct(">") && !this.atEnd) {
-        const argument = this.parseTypeRef();
-        if (!argument) return null;
-        argumentsList.push(argument);
-        this.skipNewlines();
-        if (!this.isPunct(",")) break;
-        this.advance();
-        this.skipNewlines();
-      }
-      const close = this.expectPunct(">", "to close the type arguments");
-      if (!close) return null;
-      end = close.span;
+      const applied = this.parseTypeArgumentList();
+      if (!applied) return null;
+      argumentsList = applied.arguments;
+      end = applied.end;
     }
     if (this.isPunct("?")) {
       const question = this.advance();
@@ -672,7 +678,126 @@ export class Parser {
     return { kind: "block", statements, tail, span };
   }
 
+  /** Recovery for a malformed statement: resume at the next line. */
+  private skipToLineEnd(): void {
+    while (!this.atEnd && this.tokens[this.position]!.kind !== "newline") this.position += 1;
+  }
+
+  /**
+   * Recovery for a malformed loop header: drop the body it was about to take,
+   * so its braces do not read as stray declarations.
+   */
+  private skipLoopBody(): void {
+    // The header's `{` is on the header's own line, so look for it before the
+    // line break rather than after it.
+    let scan = this.position;
+    while (scan < this.tokens.length && this.tokens[scan]!.kind !== "newline" && this.tokens[scan]!.text !== "{") {
+      scan += 1;
+    }
+    if (this.tokens[scan]?.text !== "{") {
+      this.skipToLineEnd();
+      return;
+    }
+    this.position = scan;
+    let depth = 0;
+    do {
+      if (this.isPunct("{")) depth += 1;
+      else if (this.isPunct("}")) depth -= 1;
+      this.position += 1;
+    } while (!this.atEnd && depth > 0);
+  }
+
+  /** `for binding in iterable { ... }` (Slice 5). */
+  private parseFor(): Statement | null {
+    const start = this.advance().span;
+    if (this.current.kind !== "identifier") {
+      this.error("expected a name for each item after 'for'", this.current.span, `found ${this.describe(this.current)}`, [
+        "a loop binds one item at a time, as in `for item in items { ... }`",
+      ]);
+      this.skipLoopBody();
+      return null;
+    }
+    const nameToken = this.advance();
+
+    if (!this.isKeyword("in")) {
+      this.error("expected 'in' after the loop item", this.current.span, `found ${this.describe(this.current)}`, [
+        "write `for item in items { ... }`",
+      ]);
+      this.skipLoopBody();
+      return null;
+    }
+    this.advance();
+
+    // The iterable is a control head, so ADR 0011 restricts a direct record
+    // literal there exactly as it does for `if` and `match`.
+    const suppressed = this.suppressRecordLiteral;
+    this.suppressRecordLiteral = true;
+    const iterable = this.parseExpression();
+    this.suppressRecordLiteral = suppressed;
+
+    const body = this.parseBlock();
+    if (!body) return null;
+
+    return {
+      kind: "for",
+      name: nameToken.text,
+      nameSpan: nameToken.span,
+      iterable,
+      body,
+      span: joinSpans(start, body.span),
+    };
+  }
+
+  /** `[a, b, c]`; brackets group, so elements are comma-separated. */
+  private parseListLiteral(): Expression {
+    const open = this.advance().span;
+    const elements: Expression[] = [];
+    // Argument lists and literals are not control heads, so a record literal is
+    // allowed inside even when the list itself sits in one.
+    const suppressed = this.suppressRecordLiteral;
+    this.suppressRecordLiteral = false;
+    while (!this.isPunct("]") && !this.atEnd) {
+      const before = this.position;
+      elements.push(this.parseExpression());
+      if (this.isPunct(",")) {
+        this.advance();
+        continue;
+      }
+      if (!this.isPunct("]")) {
+        this.error("expected ',' or ']' in this list", this.current.span, `found ${this.describe(this.current)}`, [
+          "the items of a list are separated by commas, and a trailing comma is allowed",
+        ]);
+        while (!this.isPunct("]") && !this.atEnd && this.position !== before) break;
+        this.suppressRecordLiteral = suppressed;
+        while (!this.isPunct("]") && !this.atEnd) this.position += 1;
+        if (this.isPunct("]")) this.advance();
+        return { kind: "error", span: open };
+      }
+    }
+    this.suppressRecordLiteral = suppressed;
+    const close = this.expectPunct("]", "to close this list");
+    if (!close) return { kind: "error", span: open };
+    return { kind: "list", elements, span: joinSpans(open, close.span) };
+  }
+
   private parseStatement(): Statement | null {
+    // `break` and `continue` are deferred (Slice 5). They are not keywords, so
+    // without this they would read as unresolved names, which explains nothing.
+    if (this.current.kind === "identifier" && (this.current.text === "break" || this.current.text === "continue")) {
+      const word = this.current.text;
+      this.unsupported(
+        `'${word}' is not available in this compiler slice`,
+        this.current.span,
+        "loops run to completion",
+        [
+          "`break` and `continue` leave a loop partway, which needs responsibility rules Koda has not settled",
+          "end the loop's work with `return`, or filter what you iterate",
+        ],
+      );
+      this.skipToLineEnd();
+      return null;
+    }
+    if (this.isKeyword("for")) return this.parseFor();
     if (this.isKeyword("return")) return this.parseReturn();
     if (this.isKeyword("let")) return this.parseRejectedLet();
     if (this.isKeyword("mut")) return this.parseBind(true);
@@ -861,29 +986,53 @@ export class Parser {
   private parsePostfix(): Expression {
     let expression = this.parsePrimary();
     for (;;) {
-      const genericEnd = this.unsupportedGenericSuffixEnd();
-      if ((expression.kind === "name" || expression.kind === "member") && genericEnd !== null) {
-        this.unsupported(
-          "generic calls and generic value construction are not available in Slice 2A",
-          joinSpans(expression.span, this.tokens[genericEnd]!.span),
-          "type arguments are supported in type positions only",
-          ["this form is not interpreted as chained comparisons; generic functions, calls and construction remain outside this slice"],
-        );
-        this.position = genericEnd + 1;
-        if (this.isPunct(".")) {
-          this.advance();
-          if (this.current.kind === "identifier") this.advance();
+      // `Name<Args>` followed by `{`, `.` or `(`. The first two are Slice 3A
+      // construction; the third is a generic call, which stays rejected.
+      const genericEnd = this.genericSuffixEnd();
+      if (expression.kind === "name" && genericEnd !== null) {
+        const follows = this.tokens[genericEnd + 1]?.text;
+
+        // A record literal is still restricted in a control head (ADR 0011), so
+        // `Box<Int> {` there keeps the brace for the block.
+        if (follows === "{" && this.suppressRecordLiteral) return expression;
+
+        const nameToken = expression;
+        const applied = this.parseTypeArgumentList();
+        if (!applied) {
+          if (this.isPunct("(")) this.skipCallArguments();
+          expression = { kind: "error", span: expression.span };
+          continue;
         }
-        if (this.isPunct("(")) this.skipCallArguments();
-        else if (this.isPunct("{")) {
-          let depth = 0;
-          do {
-            if (this.isPunct("{")) depth += 1;
-            if (this.isPunct("}")) depth -= 1;
-            this.advance();
-          } while (!this.atEnd && depth > 0);
+
+        // Slice 4A: `identity<Int>(42)`.
+        if (this.isPunct("(")) {
+          expression = this.parseCall(nameToken, applied.arguments);
+          continue;
         }
-        expression = { kind: "error", span: expression.span };
+
+        if (this.isPunct("{")) {
+          expression = this.parseRecordLiteral(nameToken.name, nameToken.span, applied.arguments);
+          continue;
+        }
+
+        // `Wrap<Int>.Has(...)`; the checker decides what the name means.
+        this.advance();
+        if (this.current.kind !== "identifier") {
+          this.error("expected a name after '.'", this.current.span, `found ${this.describe(this.current)}`, [
+            "'.' names a variant of an enum",
+          ]);
+          expression = { kind: "error", span: expression.span };
+          continue;
+        }
+        const memberToken = this.advance();
+        expression = {
+          kind: "member",
+          target: nameToken,
+          name: memberToken.text,
+          nameSpan: memberToken.span,
+          typeArguments: applied.arguments,
+          span: joinSpans(nameToken.span, memberToken.span),
+        };
         continue;
       }
       if (this.isPunct("(")) {
@@ -913,6 +1062,7 @@ export class Parser {
           target: expression,
           name: nameToken.text,
           nameSpan: nameToken.span,
+          typeArguments: null,
           span: joinSpans(expression.span, nameToken.span),
         };
         continue;
@@ -921,8 +1071,16 @@ export class Parser {
     }
   }
 
-  /** Recognition for a targeted rejection only; it creates no generic-call AST. */
-  private unsupportedGenericSuffixEnd(): number | null {
+  /**
+   * Index of the `>` closing a balanced `<...>` that is a type application, or
+   * null when the `<` is an ordinary comparison.
+   *
+   * The scan aborts on any token that cannot appear in a type-argument list, so
+   * `a < b {` never reaches the closing test: the `{` itself ends it. Only a
+   * following `(`, `{` or `.` makes the form an application, which is what
+   * keeps `a < b`, `a < b > c` and `if a < b { ... }` comparisons.
+   */
+  private genericSuffixEnd(): number | null {
     if (!this.isPunct("<")) return null;
     let depth = 0;
     for (let index = this.position; index < this.tokens.length; index += 1) {
@@ -951,7 +1109,10 @@ export class Parser {
     } while (!this.atEnd && depth > 0);
   }
 
-  private parseCall(callee: NameExpression | MemberExpression): Expression {
+  private parseCall(
+    callee: NameExpression | MemberExpression,
+    typeArguments: readonly TypeRef[] | null = null,
+  ): Expression {
     this.advance();
     const args: Expression[] = [];
     // An argument list is not a control head, so record literals are allowed
@@ -993,7 +1154,7 @@ export class Parser {
     }
     const close = this.expectPunct(")", "to close the argument list");
     this.suppressRecordLiteral = suppressed;
-    return { kind: "call", callee, args, span: joinSpans(callee.span, close?.span ?? callee.span) };
+    return { kind: "call", callee, typeArguments, args, span: joinSpans(callee.span, close?.span ?? callee.span) };
   }
 
   /** `name: value` inside a record literal. */
@@ -1011,15 +1172,20 @@ export class Parser {
     return { name: nameToken.text, nameSpan: nameToken.span, value, span: joinSpans(nameToken.span, value.span) };
   }
 
-  private parseRecordLiteral(typeToken: Token): Expression {
+  private parseRecordLiteral(
+    typeName: string,
+    typeSpan: Span,
+    typeArguments: readonly TypeRef[] | null,
+  ): Expression {
     const fields = this.parseBracedList("the fields of this record", () => this.parseFieldInit());
-    if (!fields) return { kind: "error", span: typeToken.span };
+    if (!fields) return { kind: "error", span: typeSpan };
     return {
       kind: "record",
-      typeName: typeToken.text,
-      typeSpan: typeToken.span,
+      typeName,
+      typeSpan,
+      typeArguments,
       fields,
-      span: joinSpans(typeToken.span, this.tokens[this.position - 1]?.span ?? typeToken.span),
+      span: joinSpans(typeSpan, this.tokens[this.position - 1]?.span ?? typeSpan),
     };
   }
 
@@ -1038,7 +1204,9 @@ export class Parser {
         this.advance();
         // `User {` is a record literal, except in a control head, where ADR
         // 0011 restricts the form so `if flag {` keeps its block.
-        if (this.isPunct("{") && !this.suppressRecordLiteral) return this.parseRecordLiteral(token);
+        if (this.isPunct("{") && !this.suppressRecordLiteral) {
+          return this.parseRecordLiteral(token.text, token.span, null);
+        }
         return { kind: "name", name: token.text, span: token.span };
       }
       default:
@@ -1049,6 +1217,7 @@ export class Parser {
       this.advance();
       return { kind: "bool", value: token.text === "true", span: token.span };
     }
+    if (this.isPunct("[")) return this.parseListLiteral();
     if (this.isKeyword("if")) return this.parseIf();
     if (this.isKeyword("match")) return this.parseMatch();
     if (this.isPunct("(")) {

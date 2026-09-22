@@ -243,6 +243,104 @@ The type-reference parser handles nested angle brackets; it does not parse them
 as value comparisons. Empty/omitted/partial arguments and arguments on nongeneric
 types are rejected. Exact arity and declaration-local names are Q11 semantics.
 
-This type syntax does not introduce generic record/enum construction syntax.
-Generic functions and explicit `f<T>(...)` calls remain outside Slice 2A;
-accepted future calls must not be silently reinterpreted as comparison chains.
+## Generic function syntax (Slice 4A)
+
+A function declares type parameters with the same list syntax a data
+declaration uses, directly after the name:
+
+```ko
+fn identity<T>(value: T) -> T {
+    value
+}
+
+fn pair<A, B>(a: A, b: B) -> Pair<A, B> {
+    Pair<A, B> {
+        first: a
+        second: b
+    }
+}
+```
+
+The list is non-empty, comma separated, may carry a trailing comma, and may
+span lines. Bounds, defaults and variance are not part of the grammar.
+
+A call writes its type arguments the same way:
+
+```ko
+identity<Int>(42)
+pair<String, Int>("age", 42)
+```
+
+`identity::<Int>(42)` is not Koda syntax; there is no turbofish. Type arguments
+are never omitted, so `identity(42)` is not a generic call.
+
+A name followed by a balanced `<...>` is a generic call only when the token
+immediately after `>` is `(`, which is the same rule construction already uses
+for `{` and `.`. Comparisons are unaffected: `a < b`, `x = a < b` and
+`if a < b { ... }` keep their meaning, and `a < b > c` remains a
+non-associative comparison chain rather than an application.
+
+## List and iteration syntax (Slice 5)
+
+### List literals
+
+```ko
+[1, 2, 3]
+[
+    1,
+    2,
+]
+[User { name: "Thandi" }, User { name: "Kagiso" }]
+```
+
+Square brackets are a grouping delimiter, so a newline inside them is not
+significant: elements are separated by commas, a trailing comma is allowed, and
+a literal may span lines. A record literal inside a list keeps its own
+significant newlines, because braces restore statement layout.
+
+`[]` is the empty list. There is no indexing syntax: `items[0]` is not a Koda
+form in v0.1, and reading an element is spelled `items.get(0)`.
+
+### `for`
+
+```ko
+for item in items {
+    print(item)
+}
+```
+
+**`for` and `in` are reserved words** as of Slice 5. This is an intentional
+pre-1.0 source compatibility change: a program that used either as an ordinary
+identifier is no longer valid.
+
+The header is `for`, a binding name, `in`, and an expression, followed by a
+block. The iterable is parsed as a control head, so a direct record literal is
+restricted there exactly as in an `if` or `match` head, and parentheses restore
+it. A `for` is a statement and never a value.
+
+`break` and `continue` are not part of the grammar and remain deferred.
+
+## Generic construction syntax (Slice 3A)
+
+Type arguments may be written at a construction site, using the same type
+argument syntax:
+
+```ko
+Box<Int> { value: 42 }
+Wrap<Int>.Has(42)
+```
+
+A construction site is recognised without consulting a symbol table. After a
+name, a balanced `<...>` containing only type-argument syntax is a type
+application when the token immediately after `>` is `{` or `.`; when it is `(`
+the form is a generic call and stays rejected. Anything else makes the `<` an
+ordinary comparison operator, so `a < b`, `a < b > c` and `if a < b { ... }`
+keep their meaning.
+
+`Box<Int> { ... }` is a record literal and obeys the existing control-head
+restriction: it is suppressed where an `if` or `match` head would otherwise
+swallow the brace, and parentheses restore it.
+
+Type arguments may be omitted entirely, in which case the expected type supplies
+them; the omission is syntax, and which expectations qualify is Q11 semantics.
+Writing `Box<>` is invalid at a construction site exactly as in a type position.

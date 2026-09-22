@@ -1,0 +1,47 @@
+// Slice 3B: values remain readable; responsibilities follow receiving paths.
+import { print } from "koda:io"
+enum E { Bad }
+type Pair { first: Result<Int,E>, second: Result<Int,E> }
+type Box<T> { value: T }
+enum Work { None, Pending(outcome: Result<Int,E>) }
+fn make(value: Int) -> Result<Int,E> { Ok(value) }
+fn show(r: Result<Int,E>) -> Unit {
+    match r { Ok(value) => print("{value}"), Err(_) => print("error") }
+}
+fn consumes(r: Result<Int,E>) -> Bool { show(r)
+ true }
+fn forward(p: Pair) -> Pair { p }
+fn pair() -> Pair { Pair { first: make(3), second: make(4) } }
+fn work(w: Work) -> Unit {
+    match w { Work.None => print("none"), Work.Pending(r) => show(r) }
+}
+export fn main() -> Unit {
+    r = make(1)
+    p = Pair { first: r, second: r }
+    show(p.first)
+    show(p.second)
+    show(r)
+    q = p
+    show(q.first)
+    show(q.second)
+    mut m = pair()
+    m = forward(m)
+    show(m.first)
+    show(m.second)
+    b = Box<Box<Result<Int,E>>> { value: Box { value: make(5) } }
+    extracted = b.value.value
+    show(extracted)
+    show(b.value.value)
+    nullable: Box<Result<Int,E>>? = Box { value: make(6) }
+    match nullable { null => {}, present => show(present.value) }
+    nested: Result<Int,Result<Int,E>> = Err(make(7))
+    match nested { Ok(_) => {}, Err(inner) => show(inner) }
+    work(Work.None)
+    work(Work.Pending(make(8)))
+    left = make(9)
+    skipped = false && consumes(left)
+    show(left)
+    right = make(10)
+    skippedOr = true || consumes(right)
+    show(right)
+}

@@ -27,7 +27,7 @@ const EXIT_USAGE = 2;
 
 const RUNTIME_FILE = "koda-runtime.mjs";
 
-const USAGE = `koda - the Koda toolchain (compiler slice 2A)
+const USAGE = `koda - the Koda toolchain (compiler slice 3A)
 
 usage:
   koda check <file.ko> [--json]
@@ -38,10 +38,10 @@ options:
   --out-dir <dir>   where to write generated JavaScript (default: dist)
   --json            emit diagnostics as JSON on stdout instead of text on stderr
 
-This slice compiles one self-contained .ko module, including records, enums,
-enum/nullable matching and generic data-type foundations. Generic construction,
-generic functions/calls, Result, relative imports and npm interop are not
-implemented; see docs/implementation/slice-2a.md.`;
+This compiles one self-contained .ko module: records, enums, enum and nullable
+matching, generic data types and their construction, Result values with
+must-handle enforcement. Generic functions and calls, relative imports and npm
+interop are not implemented; see docs/implementation/slice-3a.md.`;
 
 interface Options {
   readonly command: "check" | "build" | "run";

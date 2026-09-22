@@ -14,7 +14,7 @@ entity Account {
     id: Int
 }
 
-fn generic<T>(value: T) -> T {
+fn constrained<T: Int>(value: T) -> T {
     value
 }
 

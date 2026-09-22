@@ -5,14 +5,20 @@
 These files are design examples and are not part of the compiler's test suite; the fixtures under
 `tests/` are the programs that are actually compiled and executed on every run.
 
-Checked against [compiler slice 1C](../docs/implementation/slice-1c.md), `core/hello.ko` and
-`core/data-and-null.ko` compile and print their expected output, and `core/modules/greeting.ko`
-compiles on its own. `data-and-null.ko` used the `let` spelling ADR 0011 rejected; that has been
-corrected. The rest do not compile: `mutability-and-generics.ko` needs generic functions/inference (outside Slice 2A); its obsolete binding spelling has been corrected; `core/modules/main.ko` needs relative imports, which wait on Q05. Those are gaps in the
+Checked against [compiler slice 3A](../docs/implementation/slice-3a.md), `core/hello.ko`,
+`core/data-and-null.ko` and `core/results-and-enums.ko` compile and print their expected output,
+and `core/modules/greeting.ko` compiles on its own. `data-and-null.ko` used the `let` spelling
+ADR 0011 rejected; that has been corrected. Two still do not compile:
+`mutability-and-generics.ko` needs generic **functions** and call inference, which remain outside
+the implemented subset even though Slice 3A added generic value construction; and
+`core/modules/main.ko` needs relative imports, which wait on Q05. Those are gaps in the
 implementation, not defects in the examples.
 
 `results-and-enums.ko` declared a positional enum payload, which contradicted ADR 0011; it now uses
-the accepted named form, `ReservedName(name: String)`. Its enum and its `match` now work; it still needs Result values and obligations before it can compile. Examples beyond the documented slice remain future integration targets; their presence does not settle missing inference or library API decisions.
+the accepted named form, `ReservedName(name: String)`. With Result values, matching and
+must-handle enforcement in place it now compiles. Examples beyond the documented slice remain
+future integration targets; their presence does not settle missing inference or library API
+decisions.
 
 | Example | What it demonstrates | Expected output once implemented |
 | --- | --- | --- |

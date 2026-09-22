@@ -1,0 +1,65 @@
+// Slice 5 dogfood: traversing the SHAPE of the data Power Apps YAML tooling
+// will need. This is not Power Apps integration and adds no YAML syntax.
+//
+// The real model nests controls inside controls. That needs recursive
+// user-defined data, which ADR 0007 still defers, so this model is flattened
+// on purpose rather than worked around.
+import { print } from "koda:io"
+
+type Control {
+    name: String
+    kind: String
+}
+
+type Screen {
+    name: String
+    controls: List<Control>
+}
+
+type App {
+    name: String
+    screens: List<Screen>
+}
+
+fn controlCount(screen: Screen) -> Int {
+    screen.controls.length()
+}
+
+fn summarise(app: App) -> String {
+    "{app.name} has {app.screens.length()} screens"
+}
+
+export fn main() -> Unit {
+    app = App {
+        name: "Inspection"
+        screens: [
+            Screen {
+                name: "Home"
+                controls: [
+                    Control { name: "Title", kind: "Label" },
+                    Control { name: "Start", kind: "Button" },
+                ]
+            },
+            Screen {
+                name: "Details"
+                controls: [
+                    Control { name: "Notes", kind: "TextInput" },
+                ]
+            },
+            Screen {
+                name: "Empty"
+                controls: []
+            },
+        ]
+    }
+
+    print(summarise(app))
+
+    for screen in app.screens {
+        print("{screen.name} ({controlCount(screen)})")
+
+        for control in screen.controls {
+            print("  {control.name}: {control.kind}")
+        }
+    }
+}

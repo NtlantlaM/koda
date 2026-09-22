@@ -8,7 +8,7 @@ import { DiagnosticBag } from "../src/diagnostics/diagnostic.js";
 import { tokenize } from "../src/syntax/lexer.js";
 import { parseModule } from "../src/syntax/parser.js";
 import { checkModule } from "../src/check/checker.js";
-import { instantiatedField, isAssignable, sameType, substitute, typeName } from "../src/check/types.js";
+import { instantiatedField, isAssignable, sameDeclarationId, sameType, substitute, typeName, type KType } from "../src/check/types.js";
 import { repositoryRoot } from "./fixtures.js";
 
 const root = repositoryRoot();
@@ -132,22 +132,100 @@ describe("generic data-type foundations", () => {
     }
   });
 
-  test("generic construction for user-defined data stays deferred", () => {
-    // Result's prelude constructors are a narrow accepted surface; they are not
-    // authority for arbitrary generic construction.
-    const result = build(
-      { readFile: () => "type Box<T> { value: T }\nfn use() -> Unit { b = Box<Int> { value: 42 } }" },
+  test("construction applies the written arguments and keeps applications distinct", () => {
+    const ir = typed(
+      'type Box<T> { value: T }\nfn a() -> Box<Int> { Box<Int> { value: 1 } }\nfn b() -> Box<String> { Box { value: "x" } }',
+    );
+    const first = ir.functions[0]!.body.type;
+    const second = ir.functions[1]!.body.type;
+    assert.equal(typeName(first), "Box<Int>");
+    assert.equal(typeName(second), "Box<String>");
+    assert.equal(sameType(first, second), false);
+    assert.equal(isAssignable(first, second), false);
+  });
+
+  test("construction does not mutate the declaration it instantiates", () => {
+    const ir = typed("type Box<T> { value: T }\nfn a() -> Box<Int> { Box<Int> { value: 1 } }");
+    const box = ir.functions[0]!.body.type;
+    assert.equal(box.kind, "Record");
+    if (box.kind !== "Record") return;
+    assert.equal(typeName(box.declaration.fields[0]!.type), "T");
+    assert.equal(typeName(instantiatedField(box.declaration.fields[0]!, box.declaration.id, box.arguments).type), "Int");
+  });
+
+  test("a generic value still needs a complete expected type or written arguments", () => {
+    for (const source of [
+      "type Box<T> { value: T }\nfn use() -> Unit { b = Box { value: 42 } }",
+      "enum Wrap<T> { Has(value: T) }\nfn use() -> Unit { w = Wrap.Has(42) }",
+      "type Box<T> { value: T }\ntype Pair<A, B> { left: A, right: B }\nfn use() -> Pair<Int, Int> { Box { value: 1 } }",
+    ]) {
+      const result = build({ readFile: () => source }, { path });
+      assert.equal(result.ok, false, source);
+      assert.ok(result.diagnostics.some((diagnostic) => diagnostic.code === "KODA-T0001"), source);
+      // The value's own contents must never be what supplies the argument.
+      assert.ok(result.diagnostics.every((diagnostic) => !diagnostic.message.includes("inferred")), source);
+      assert.deepEqual(result.artifacts, []);
+    }
+  });
+
+  test("written type arguments are authoritative, never adjusted to the context", () => {
+    const result = check(
+      { readFile: () => "type Box<T> { value: T }\nfn use() -> Box<String> { Box<Int> { value: 42 } }" },
       { path },
     );
     assert.equal(result.ok, false);
-    assert.ok(result.diagnostics.some((diagnostic) => diagnostic.code === "KODA-U0001"));
+    const mismatch = result.diagnostics.find((diagnostic) => diagnostic.code === "KODA-T0001");
+    assert.ok(mismatch);
+    assert.match(mismatch.message, /expected Box<String>, found Box<Int>/);
   });
 
-  test("existing comparisons remain comparisons; explicit generic calls are rejected", () => {
+  test("an angle bracket after a name is an application only before '{', '.' or '('", () => {
+    // `a < b > c` stays two comparisons, so it fails as a non-associative
+    // chain. What matters is that it is never read as a type application.
+    const chained = check(
+      { readFile: () => "fn use(a: Int, b: Int, c: Int) -> Bool { a < b > c }" },
+      { path },
+    );
+    assert.equal(chained.ok, false);
+    assert.equal(chained.diagnostics[0]?.code, "KODA-P0001");
+    assert.match(chained.diagnostics[0]!.message, /cannot be chained/);
+    assert.ok(chained.diagnostics.every((diagnostic) => diagnostic.code !== "KODA-U0001"));
+
     const comparison = check({ readFile: () => "fn less(a: Int, b: Int) -> Bool { a < b }" }, { path });
     assert.equal(comparison.ok, true);
-    const call = check({ readFile: () => 'fn use() -> Unit { parse<Int>("42") }' }, { path });
-    assert.deepEqual(call.diagnostics.map((diagnostic) => diagnostic.code), ["KODA-U0001"]);
+
+    const head = check(
+      { readFile: () => "fn use(a: Int, b: Int) -> Int { if a < b { 1 } else { 2 } }" },
+      { path },
+    );
+    assert.equal(head.ok, true);
+  });
+
+  test("construction is fully erased: no type argument reaches the emitted module", () => {
+    const emitted = build(
+      { readFile: () => "type Box<T> { value: T }\nexport fn main() -> Unit { b = Box<Int> { value: 1 } }" },
+      { path, moduleFileName: "m.js" },
+    );
+    assert.ok(emitted.ok, JSON.stringify(emitted.diagnostics));
+    const module = emitted.artifacts.find((artifact) => artifact.fileName === "m.js")!;
+    assert.match(module.contents, /k_value: 1n/);
+    assert.doesNotMatch(module.contents, /Box|Int/);
+  });
+
+  test("existing comparisons remain comparisons now that generic calls parse", () => {
+    const comparison = check({ readFile: () => "fn less(a: Int, b: Int) -> Bool { a < b }" }, { path });
+    assert.equal(comparison.ok, true);
+
+    // A generic call is the `(` branch of the same lookahead; an unknown callee
+    // is an unresolved name, never a comparison and never a parse failure.
+    const unknown = check({ readFile: () => 'fn use() -> Unit { parse<Int>("42") }' }, { path });
+    assert.deepEqual(unknown.diagnostics.map((diagnostic) => diagnostic.code), ["KODA-N0001"]);
+
+    const chained = check(
+      { readFile: () => "fn use(a: Int, b: Int, c: Int) -> Bool { a < b > c }" },
+      { path },
+    );
+    assert.equal(chained.diagnostics[0]?.code, "KODA-P0001");
   });
 
   test("substitution does not silently implement the deferred nullable Unit runtime", () => {
@@ -168,11 +246,98 @@ describe("generic data-type foundations", () => {
       "enum Box<T:> {}", "type Box<T> { value: Box<Box< }",
       "type Box<T> { value: T }\nfn use(x: Box<) -> Unit {}",
       "type Box<T> { value: T }\nfn use(x: Box<Int String>) -> Unit {}",
+      "fn f<", "fn f<T", "fn f<,>(x: Int) -> Int { x }",
+      "fn f<T>(x: T) -> T { x }\nfn g() -> Int { f<(1) }",
+      "fn f<T>(x: T) -> T { x }\nfn g() -> Int { f<Int>( }",
     ]) {
       const result = build({ readFile: () => source }, { path });
       assert.equal(result.ok, false, source);
       assert.deepEqual(result.artifacts, []);
       assert.ok(result.diagnostics.length > 0);
     }
+  });
+});
+
+describe("generic functions", () => {
+  test("a call's type is the substituted return type", () => {
+    const ir = typed(
+      "type Box<T> { value: T }\n" +
+        "fn identity<T>(x: T) -> T { x }\n" +
+        "fn box<T>(x: T) -> Box<T> { Box<T> { value: x } }\n" +
+        "fn a() -> Int { identity<Int>(1) }\n" +
+        "fn b() -> Box<String> { box<String>(\"k\") }",
+    );
+    assert.equal(typeName(ir.functions[2]!.body.type), "Int");
+    assert.equal(typeName(ir.functions[3]!.body.type), "Box<String>");
+  });
+
+  test("a callee's type parameter cannot capture a caller's", () => {
+    // Q05-A gave functions distinct declaration ids precisely for this.
+    const ir = typed(
+      "fn identity<T>(x: T) -> T { x }\nfn forward<U>(x: U) -> U { identity<U>(x) }",
+    );
+    const identity = ir.functions[0]!.symbol;
+    const forward = ir.functions[1]!.symbol;
+    assert.equal(sameDeclarationId(identity.declarationId, forward.declarationId), false);
+
+    const t = identity.typeParameters[0]!;
+    const u = forward.typeParameters[0]!;
+    assert.equal(t.index, u.index);
+    assert.equal(t.name, "T");
+    assert.equal(u.name, "U");
+    assert.equal(sameDeclarationId(t.ownerId, u.ownerId), false);
+    assert.equal(sameType({ kind: "TypeParameter", parameter: t }, { kind: "TypeParameter", parameter: u }), false);
+
+    // Substituting identity's owner must leave forward's parameter untouched.
+    const asU: KType = { kind: "TypeParameter", parameter: u };
+    assert.equal(typeName(substitute(asU, identity.declarationId, [{ kind: "Int" }])), "U");
+    assert.equal(typeName(substitute(asU, forward.declarationId, [{ kind: "Int" }])), "Int");
+
+    // The forwarding call still types as the caller's own parameter.
+    assert.equal(typeName(ir.functions[1]!.body.type), "U");
+  });
+
+  test("type arguments are never inferred", () => {
+    const missing = check(
+      { readFile: () => "fn identity<T>(x: T) -> T { x }\nfn use() -> Int { identity(1) }" },
+      { path },
+    );
+    assert.equal(missing.ok, false);
+    const diagnostic = missing.diagnostics.find((item) => item.code === "KODA-T0011");
+    assert.ok(diagnostic);
+    assert.ok(diagnostic.notes?.some((note) => note.includes("does not infer")));
+    // No message may offer inference as the remedy.
+    assert.ok(missing.diagnostics.every((item) => !/\binferred\b|\bwill infer\b/.test(item.message)));
+  });
+
+  test("a generic call emits the same shape as an ordinary call", () => {
+    const emitted = build(
+      {
+        readFile: () =>
+          "fn identity<T>(x: T) -> T { x }\n" +
+          "fn plain(x: Int) -> Int { x }\n" +
+          "export fn main() -> Unit { a = identity<Int>(1)\n    b = plain(1) }",
+      },
+      { path, moduleFileName: "m.js" },
+    );
+    assert.ok(emitted.ok, JSON.stringify(emitted.diagnostics));
+    const module = emitted.artifacts.find((artifact) => artifact.fileName === "m.js")!;
+    assert.match(module.contents, /const k_a = k_identity\(1n\);/);
+    assert.match(module.contents, /const k_b = k_plain\(1n\);/);
+    // No type argument, descriptor or specialization may reach the output.
+    assert.doesNotMatch(module.contents, /Int|typeArgument|<|identity\$/);
+  });
+
+  test("an abstract type parameter must be handed on, and is never told to match", () => {
+    const result = check({ readFile: () => "fn ignore<T>(x: T) -> Unit { }" }, { path });
+    assert.equal(result.ok, false);
+    const diagnostic = result.diagnostics.find((item) => item.code === "KODA-T0012");
+    assert.ok(diagnostic, "an abandoned abstract responsibility must be reported");
+    const notes = (diagnostic.notes ?? []).join(" ");
+    assert.match(notes, /unconstrained generic type/);
+    assert.doesNotMatch(notes, /match the Result/);
+
+    // Handing it on is accepted.
+    assert.equal(check({ readFile: () => "fn identity<T>(x: T) -> T { x }" }, { path }).ok, true);
   });
 });

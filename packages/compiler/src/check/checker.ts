@@ -19,6 +19,7 @@
  * `1 + 1.0` is a mismatch while the same expression in a Float-expected
  * position is not.
  */
+import { Shapes } from "./obligation-shapes.js";
 import { Codes } from "../diagnostics/codes.js";
 import type { DiagnosticBag } from "../diagnostics/diagnostic.js";
 import { spanFrom, type Span } from "../source/source.js";
@@ -60,7 +61,13 @@ import type {
 } from "../ir/ir.js";
 import {
   BoolType,
+  ENTRY_MODULE_ID,
   ErrorType,
+  PRELUDE_MODULE_ID,
+  declarationKey,
+  sameDeclarationId,
+  substitute,
+  type DeclarationId,
   FloatType,
   IntType,
   NeverType,
@@ -108,9 +115,10 @@ const RESERVED_PRELUDE_NAMES: ReadonlyMap<string, string> = new Map([
  * Prelude names that resolve to real behaviour but stay closed to user
  * declarations and bindings, so `Result`, `Ok` and `Err` always mean one thing.
  */
-const PRELUDE_NAMES: ReadonlySet<string> = new Set(["Result", "Ok", "Err"]);
+const PRELUDE_NAMES: ReadonlySet<string> = new Set(["Result", "Ok", "Err", "List"]);
 
 const RESULT_TYPE_NAME = "Result";
+const LIST_TYPE_NAME = "List";
 const RESULT_OK = "Ok";
 const RESULT_ERR = "Err";
 
@@ -152,6 +160,13 @@ export class Checker {
   private readonly functions = new Map<string, FunctionSymbol>();
   private scopes: Scope[] = [];
   private returnType: KType = UnitType;
+  /**
+   * Type parameters of the function whose signature or body is being checked
+   * (Slice 4A). Empty outside a generic function. It mirrors `returnType`:
+   * ambient per-function state, so `T` resolves in annotations and in written
+   * construction arguments without threading a parameter through every call.
+   */
+  private typeParameters: readonly TypeParameterSymbol[] = [];
   private nextSymbolId = 0;
   private readonly records = new Map<string, RecordDeclaration>();
   private readonly enums = new Map<string, EnumDeclaration>();
@@ -165,7 +180,20 @@ export class Checker {
    */
   private readonly moduleNames = new Map<string, { what: string; span: Span }>();
   private resultDeclaration: EnumDeclaration | null = null;
-  private nextDeclarationId = 0;
+  private listDeclaration: RecordDeclaration | null = null;
+  /**
+   * Per-module local declaration counter (Q05-A).
+   *
+   * Records, enums and functions all draw from it, so any declaration that may
+   * own generic parameters has an identity. The prelude allocates separately,
+   * under its own module id.
+   */
+  private nextLocalId = 0;
+
+  /** The next `{ module, local }` for a declaration of the module being checked. */
+  private allocateDeclarationId(): DeclarationId {
+    return { module: ENTRY_MODULE_ID, local: this.nextLocalId++ };
+  }
 
   constructor(path: string, diagnostics: DiagnosticBag) {
     this.path = path;
@@ -176,6 +204,7 @@ export class Checker {
 
   check(module: Module): IRModule {
     this.declarePreludeResult();
+    this.declarePreludeList();
     this.checkImports(module);
 
     // Declarations are mutually visible regardless of order, so names are
@@ -199,6 +228,7 @@ export class Checker {
       functions,
       entry: this.resolveEntry(module),
       resultDeclarationId: this.resultDeclaration?.id ?? null,
+      listDeclarationId: this.listDeclaration?.id ?? null,
     };
   }
 
@@ -211,7 +241,14 @@ export class Checker {
    * lowering - treats Result as the ordinary enum it is, with no special case.
    */
   private declarePreludeResult(): void {
-    const id = this.nextDeclarationId++;
+    // Canonical prelude identity (Q05-A): `Result` is the same nominal
+    // declaration in every module of a compilation, because it is allocated
+    // under the prelude's own module id rather than the user module's counter.
+    //
+    // SEAM: the prelude is not yet a compiled module - it has canonical
+    // identity and nothing else. Making it a real module needs the multi-source
+    // machinery Q05-B owns. See docs/implementation/q05a-identity-foundation.md.
+    const id: DeclarationId = { module: PRELUDE_MODULE_ID, local: 0 };
     const span = spanFrom(this.path, 0, 0);
     const typeParameters: TypeParameterSymbol[] = [
       { ownerId: id, index: 0, name: "T", declarationSpan: span },
@@ -249,9 +286,45 @@ export class Checker {
     this.enums.set(RESULT_TYPE_NAME, declaration);
   }
 
+  /**
+   * Builds the prelude `List<T>` (Slice 5).
+   *
+   * It is an ordinary generic record-shaped nominal declaration with no fields,
+   * so arity, substitution, `sameType`, `typeName` and invariance all come from
+   * the existing machinery. Its elements are not a declared member, which is
+   * why the obligation shape recognises it by declaration identity instead.
+   */
+  private declarePreludeList(): void {
+    const id: DeclarationId = { module: PRELUDE_MODULE_ID, local: 1 };
+    const span = spanFrom(this.path, 0, 0);
+    const declaration: RecordDeclaration = {
+      id,
+      name: LIST_TYPE_NAME,
+      nameSpan: span,
+      exported: true,
+      typeParameters: [{ ownerId: id, index: 0, name: "T", declarationSpan: span }],
+      fields: [],
+      fieldsByName: new Map(),
+    };
+    this.listDeclaration = declaration;
+    this.records.set(LIST_TYPE_NAME, declaration);
+  }
+
+  /** True for the prelude List, whatever element type it carries. */
+  private isList(type: KType): type is Extract<KType, { kind: "Record" }> {
+    return type.kind === "Record" && this.listDeclaration !== null
+      && sameDeclarationId(type.declaration.id, this.listDeclaration.id);
+  }
+
+  /** `List<T>` for an element type. */
+  private listOf(element: KType): KType {
+    return this.listDeclaration ? recordType(this.listDeclaration, [element]) : ErrorType;
+  }
+
   /** True for the prelude Result, whatever arguments it carries. */
   private isResult(type: KType): type is Extract<KType, { kind: "Enum" }> {
-    return type.kind === "Enum" && type.declaration.id === this.resultDeclaration?.id;
+    return type.kind === "Enum" && this.resultDeclaration !== null
+      && sameDeclarationId(type.declaration.id, this.resultDeclaration.id);
   }
 
   /**
@@ -278,12 +351,18 @@ export class Checker {
     return true;
   }
 
-  private declareTypeParameters(parameters: readonly TypeParameterDecl[], ownerId: number): TypeParameterSymbol[] {
+  private declareTypeParameters(parameters: readonly TypeParameterDecl[], ownerId: DeclarationId): TypeParameterSymbol[] {
     const seen = new Map<string, Span>();
     return parameters.map((parameter, index) => {
       const previous = seen.get(parameter.name);
       if (previous) this.duplicate(parameter.name, parameter.span, previous);
-      if (PRIMITIVE_TYPES.has(parameter.name) || parameter.name === "Result" || parameter.name === "Decimal") {
+      // Closed names stay closed in every position, including a type parameter
+      // (Slice 4A aligned functions with the rule data declarations follow).
+      if (
+        PRIMITIVE_TYPES.has(parameter.name) ||
+        PRELUDE_NAMES.has(parameter.name) ||
+        RESERVED_PRELUDE_NAMES.has(parameter.name)
+      ) {
         this.diagnostics.add({
           code: Codes.DuplicateName,
           message: "'" + parameter.name + "' is a reserved type name",
@@ -301,9 +380,10 @@ export class Checker {
     for (const declaration of module.declarations) {
       if (declaration.kind === "type") {
         if (!this.claimModuleName(declaration.name, declaration.nameSpan, "type")) continue;
+        const recordId = this.allocateDeclarationId();
         this.records.set(declaration.name, {
-          typeParameters: this.declareTypeParameters(declaration.typeParameters, this.nextDeclarationId),
-          id: this.nextDeclarationId++,
+          typeParameters: this.declareTypeParameters(declaration.typeParameters, recordId),
+          id: recordId,
           name: declaration.name,
           nameSpan: declaration.nameSpan,
           exported: declaration.exported,
@@ -314,9 +394,10 @@ export class Checker {
       }
       if (declaration.kind === "enum") {
         if (!this.claimModuleName(declaration.name, declaration.nameSpan, "enum")) continue;
+        const enumId = this.allocateDeclarationId();
         this.enums.set(declaration.name, {
-          typeParameters: this.declareTypeParameters(declaration.typeParameters, this.nextDeclarationId),
-          id: this.nextDeclarationId++,
+          typeParameters: this.declareTypeParameters(declaration.typeParameters, enumId),
+          id: enumId,
           name: declaration.name,
           nameSpan: declaration.nameSpan,
           exported: declaration.exported,
@@ -410,18 +491,21 @@ export class Checker {
    */
   private rejectRecursiveData(): void {
     interface Node {
+      readonly id: DeclarationId;
       readonly name: string;
       readonly nameSpan: Span;
-      readonly edges: { readonly to: number; readonly via: string }[];
+      readonly edges: { readonly to: string; readonly via: string }[];
     }
-    const nodes = new Map<number, Node>();
+    // Q05-A: keyed by `declarationKey`, not a bare number, so two modules'
+    // local id 1 can never share a node.
+    const nodes = new Map<string, Node>();
 
     // Walk stored type expressions, including nullable wrappers and arguments.
     // Edges are declaration identities: changing arguments cannot hide a cycle.
-    const targets = (type: KType): number[] => {
+    const targets = (type: KType): string[] => {
       if (type.kind === "Nullable") return targets(type.inner);
       if (type.kind === "Record" || type.kind === "Enum") {
-        return [type.declaration.id, ...type.arguments.flatMap(targets)];
+        return [declarationKey(type.declaration.id), ...type.arguments.flatMap(targets)];
       }
       return [];
     };
@@ -431,7 +515,7 @@ export class Checker {
       for (const field of record.fields) {
         for (const to of targets(field.type)) edges.push({ to, via: field.name });
       }
-      nodes.set(record.id, { name: record.name, nameSpan: record.nameSpan, edges });
+      nodes.set(declarationKey(record.id), { id: record.id, name: record.name, nameSpan: record.nameSpan, edges });
     }
     for (const enumeration of this.enums.values()) {
       const edges: Node["edges"] = [];
@@ -440,14 +524,14 @@ export class Checker {
           for (const to of targets(component.type)) edges.push({ to, via: `${variant.name}.${component.name}` });
         }
       }
-      nodes.set(enumeration.id, { name: enumeration.name, nameSpan: enumeration.nameSpan, edges });
+      nodes.set(declarationKey(enumeration.id), { id: enumeration.id, name: enumeration.name, nameSpan: enumeration.nameSpan, edges });
     }
 
-    const state = new Map<number, "visiting" | "done">();
-    const reported = new Set<number>();
-    const stack: { id: number; via: string }[] = [];
+    const state = new Map<string, "visiting" | "done">();
+    const reported = new Set<string>();
+    const stack: { id: string; via: string }[] = [];
 
-    const visit = (id: number): void => {
+    const visit = (id: string): void => {
       const node = nodes.get(id);
       if (!node || state.get(id) === "done") return;
 
@@ -481,7 +565,11 @@ export class Checker {
       state.set(id, "done");
     };
 
-    for (const id of [...nodes.keys()].sort((a, b) => a - b)) visit(id);
+    // Declaration order, as before: by module then local, never lexicographic.
+    const ordered = [...nodes.entries()].sort(([, a], [, b]) =>
+      a.id.module - b.id.module || a.id.local - b.id.local,
+    );
+    for (const [id] of ordered) visit(id);
   }
 
   private checkImports(module: Module): void {
@@ -530,6 +618,8 @@ export class Checker {
     };
     this.functions.set("print", {
       id: this.nextSymbolId++,
+      declarationId: this.allocateDeclarationId(),
+      typeParameters: [],
       name: "print",
       parameters: [parameter],
       returnType: UnitType,
@@ -549,6 +639,10 @@ export class Checker {
       }
       if (!this.claimModuleName(declaration.name, declaration.nameSpan, "function")) continue;
 
+      const declarationId = this.allocateDeclarationId();
+      const typeParameters = this.declareTypeParameters(declaration.typeParameters, declarationId);
+      this.typeParameters = typeParameters;
+
       const parameters: LocalSymbol[] = [];
       const seen = new Map<string, Span>();
       for (const parameter of declaration.parameters) {
@@ -561,7 +655,7 @@ export class Checker {
         parameters.push({
           id: this.nextSymbolId++,
           name: parameter.name,
-          type: this.resolveType(parameter.type),
+          type: this.resolveType(parameter.type, typeParameters),
           mutable: false,
           declarationSpan: parameter.nameSpan,
         });
@@ -569,12 +663,16 @@ export class Checker {
 
       this.functions.set(declaration.name, {
         id: this.nextSymbolId++,
+        // Q05-A identity, now spent: it owns this function's type parameters.
+        declarationId,
+        typeParameters,
         name: declaration.name,
         parameters,
-        returnType: this.resolveType(declaration.returnType),
+        returnType: this.resolveType(declaration.returnType, typeParameters),
         origin: { kind: "declared", exported: declaration.exported },
         declarationSpan: declaration.nameSpan,
       });
+      this.typeParameters = [];
     }
   }
 
@@ -626,6 +724,8 @@ export class Checker {
   private checkFunction(declaration: FunctionDecl, symbol: FunctionSymbol): IRFunction {
     this.scopes = [{ bindings: new Map(), refinements: new Map() }];
     this.returnType = symbol.returnType;
+    // Slice 4A: `T` resolves in body annotations and construction arguments.
+    this.typeParameters = symbol.typeParameters;
     for (const parameter of symbol.parameters) {
       this.scopes[0]!.bindings.set(parameter.name, parameter);
     }
@@ -634,7 +734,7 @@ export class Checker {
     const bodyType = result.block.type;
     if (!isAssignable(bodyType, symbol.returnType)) {
       const span = declaration.body.tail?.span ?? declaration.body.span;
-      if (symbol.returnType.kind === "Unit" && this.isResultType(bodyType)) {
+      if (symbol.returnType.kind === "Unit" && this.hasResponsibility(bodyType)) {
         this.reportDiscardedResult(span, bodyType);
       } else if (bodyType.kind === "Unit" && symbol.returnType.kind !== "Unit") {
         this.diagnostics.add({
@@ -657,6 +757,7 @@ export class Checker {
     }
 
     this.scopes = [];
+    this.typeParameters = [];
     return { symbol, body: result.block };
   }
 
@@ -810,6 +911,8 @@ export class Checker {
 
   private checkStatement(statement: Statement): { statement: IRStatement; alwaysReturns: boolean } | null {
     switch (statement.kind) {
+      case "for":
+        return this.checkFor(statement);
       case "bind":
         return this.checkBind(statement);
       case "return": {
@@ -847,6 +950,159 @@ export class Checker {
     }
   }
 
+  /**
+   * `[a, b, c]` (Slice 5).
+   *
+   * An expected `List<T>` is authoritative and supplies `T` to every element.
+   * Otherwise the first element's type is the element type and every later one
+   * is checked against exactly that. There is no join and no unification, so a
+   * sibling never widens another.
+   */
+  private checkList(
+    expression: Extract<Expression, { kind: "list" }>,
+    expected: KType | null,
+  ): IRExpression {
+    const span = expression.span;
+    // Peel exactly one outer nullable, the general contextual rule.
+    const target = expected && expected.kind === "Nullable" ? expected.inner : expected;
+    const expectedElement = target && this.isList(target) ? target.arguments[0] ?? null : null;
+
+    if (expression.elements.length === 0) {
+      if (!expectedElement) {
+        this.diagnostics.add({
+          code: Codes.TypeMismatch,
+          message: "this empty list has no element type",
+          span,
+          label: "nothing here says what it would hold",
+          notes: [
+            "give it a context that names the element type, such as an annotated binding `values: List<Int> = []`, a return type, or a parameter",
+            "Koda never invents the element type of an empty list",
+          ],
+        });
+        return this.errorValue(span);
+      }
+      const elementType = this.supportedMemberType(expectedElement, span);
+      if (elementType.kind === "Error") return this.errorValue(span);
+      return { kind: "list", elements: [], type: this.listOf(elementType), span };
+    }
+
+    const elements: IRExpression[] = [];
+    let elementType: KType | null = expectedElement
+      ? this.supportedMemberType(expectedElement, span)
+      : null;
+    if (elementType !== null && elementType.kind === "Error") return this.errorValue(span);
+    let originSpan: Span | null = null;
+    let valid = true;
+
+    for (const element of expression.elements) {
+      const value = this.checkExpression(element, elementType);
+      if (value.type.kind === "Error") {
+        valid = false;
+        continue;
+      }
+      if (elementType === null) {
+        // The first element decides, and only because nothing else did.
+        const first = this.supportedMemberType(value.type, element.span);
+        if (first.kind === "Error") {
+          valid = false;
+          continue;
+        }
+        elementType = first;
+        originSpan = element.span;
+        elements.push(value);
+        continue;
+      }
+      if (!isAssignable(value.type, elementType)) {
+        this.diagnostics.add({
+          code: Codes.TypeMismatch,
+          message: `this list holds ${typeName(elementType)} values, but this one is ${typeName(value.type)}`,
+          span: element.span,
+          label: `this is ${typeName(value.type)}`,
+          secondary: originSpan
+            ? [{ span: originSpan, message: `the first item is ${typeName(elementType)}, which sets the element type` }]
+            : [],
+          notes: [
+            "every item of a list has the same type; Koda does not widen them to a common one",
+            originSpan
+              ? "annotate the binding to choose the element type, as in `values: List<Int> = [...]`"
+              : "the expected type sets the element type here",
+          ],
+        });
+        valid = false;
+        continue;
+      }
+      elements.push(value);
+    }
+
+    if (!valid || elementType === null) return this.errorValue(span);
+    return { kind: "list", elements, type: this.listOf(elementType), span };
+  }
+
+  /**
+   * `for item in items { ... }` (Slice 5).
+   *
+   * A statement, never a value. The binding is immutable and body-scoped, and
+   * the ordinary no-shadowing rule applies.
+   */
+  private checkFor(
+    statement: Extract<Statement, { kind: "for" }>,
+  ): { statement: IRStatement; alwaysReturns: boolean } | null {
+    const iterable = this.checkExpression(statement.iterable, null);
+
+    let elementType: KType = ErrorType;
+    if (iterable.type.kind !== "Error") {
+      if (!this.isList(iterable.type)) {
+        this.diagnostics.add({
+          code: Codes.TypeMismatch,
+          message: `${article(typeName(iterable.type))} ${typeName(iterable.type)} value cannot be iterated`,
+          span: statement.iterable.span,
+          label: `this is ${typeName(iterable.type)}`,
+          notes: ["`for` walks the items of a List; other types have no items to walk"],
+        });
+        return null;
+      }
+      elementType = this.supportedMemberType(iterable.type.arguments[0] ?? ErrorType, statement.nameSpan);
+      if (elementType.kind === "Error") return null;
+    }
+
+    if (this.lookupLocal(statement.name)) {
+      this.duplicate(statement.name, statement.nameSpan, this.lookupLocal(statement.name)!.declarationSpan);
+      return null;
+    }
+    if (RESERVED_PRELUDE_NAMES.has(statement.name) || PRIMITIVE_TYPES.has(statement.name) || PRELUDE_NAMES.has(statement.name)) {
+      this.diagnostics.add({
+        code: Codes.DuplicateName,
+        message: `'${statement.name}' is a reserved name`,
+        span: statement.nameSpan,
+        label: "choose another name for the loop item",
+      });
+      return null;
+    }
+
+    const binding: LocalSymbol = {
+      id: this.nextSymbolId++,
+      name: statement.name,
+      type: elementType,
+      mutable: false,
+      declarationSpan: statement.nameSpan,
+    };
+
+    this.pushScope();
+    this.scopes.at(-1)!.bindings.set(binding.name, binding);
+    const body = this.checkBlock(statement.body, UnitType);
+    this.scopes.pop();
+
+    if (body.block.tail && body.block.type.kind !== "Unit" && body.block.type.kind !== "Never") {
+      this.expect(body.block.tail, UnitType, "a loop body cannot produce a value");
+    }
+
+    // A loop may run zero times, so it never proves the function returned.
+    return {
+      statement: { kind: "for", binding, iterable, body: body.block, type: UnitType, span: statement.span },
+      alwaysReturns: false,
+    };
+  }
+
   private checkBind(statement: Extract<Statement, { kind: "bind" }>): {
     statement: IRStatement;
     alwaysReturns: boolean;
@@ -880,7 +1136,7 @@ export class Checker {
       return null;
     }
 
-    const declared = statement.declaredType ? this.resolveType(statement.declaredType) : null;
+    const declared = statement.declaredType ? this.resolveType(statement.declaredType, this.typeParameters) : null;
     const value = this.checkExpression(statement.value, declared);
     if (declared) this.expect(value, declared, "this is the value being bound");
 
@@ -966,10 +1222,12 @@ export class Checker {
       case "paren":
         // Parentheses group, and pass the expected type through unchanged.
         return this.checkExpression(expression.expression, expected);
+      case "list":
+        return this.checkList(expression, expected);
       case "record":
-        return this.checkRecord(expression);
+        return this.checkRecord(expression, expected);
       case "member":
-        return this.checkMember(expression);
+        return this.checkMember(expression, expected);
       case "match":
         return this.checkMatch(expression, expected);
       case "error":
@@ -1321,7 +1579,7 @@ export class Checker {
     if (pattern.enumName === null) {
       // `Ok(value)` is accepted only for the prelude Result. ADR 0011 keeps
       // ordinary user enum variants qualified.
-      if (!this.resultDeclaration || declaration.id !== this.resultDeclaration.id) {
+      if (!this.resultDeclaration || !sameDeclarationId(declaration.id, this.resultDeclaration.id)) {
         this.diagnostics.add({
           code: Codes.UnresolvedName,
           message: `'${pattern.variantName}' must say which enum it belongs to`,
@@ -1524,17 +1782,88 @@ export class Checker {
    * exactly once and to reject unknown fields. Entries keep their source order
    * so that side effects still run left to right.
    */
-  private unsupportedGenericConstruction(name: string, span: Span): void {
+  /**
+   * The type arguments for a construction site (Slice 3A).
+   *
+   * They come from exactly two places: arguments written at the site, or an
+   * expected type that is an application of this very declaration. Exactly one
+   * outer nullable wrapper is looked through, which is the general rule Result
+   * was the first instance of. Field and payload values are never consulted, so
+   * there are no inference variables and no constraint solving.
+   *
+   * Returns null when nothing supplies them, after reporting why.
+   */
+  private resolveConstructionArguments(
+    declaration: RecordDeclaration | EnumDeclaration,
+    written: readonly TypeRef[] | null,
+    expected: KType | null,
+    span: Span,
+    typeSpan: Span,
+  ): readonly KType[] | null {
+    // Written arguments are authoritative: they are resolved on their own and
+    // never adjusted to satisfy the context. A disagreement becomes an ordinary
+    // mismatch at the caller's `expect`.
+    if (written !== null) {
+      const applied = this.resolveTypeName(
+        { name: declaration.name, arguments: written, nullable: false, span: typeSpan },
+        this.typeParameters,
+      );
+      if (applied.kind === "Error") return null;
+      if (applied.kind !== "Record" && applied.kind !== "Enum") return null;
+      return applied.arguments;
+    }
+
+    if (declaration.typeParameters.length === 0) return [];
+
+    // Peel exactly one outer Nullable, and nothing more.
+    const target = expected && expected.kind === "Nullable" ? expected.inner : expected;
+    if (
+      target &&
+      (target.kind === "Record" || target.kind === "Enum") &&
+      sameDeclarationId(target.declaration.id, declaration.id) &&
+      target.arguments.length === declaration.typeParameters.length
+    ) {
+      return target.arguments;
+    }
+
+    this.unconstrainedConstruction(declaration, span, target);
+    return null;
+  }
+
+  /** A generic construction with nothing to say what its arguments are. */
+  private unconstrainedConstruction(
+    declaration: RecordDeclaration | EnumDeclaration,
+    span: Span,
+    found: KType | null,
+  ): void {
+    const parameters = declaration.typeParameters;
+    const names = parameters.map((parameter) => `'${parameter.name}'`).join(", ");
+    const sample = parameters.map(() => "Int").join(", ");
+    const shape = "fields" in declaration
+      ? `${declaration.name}<${sample}> { ... }`
+      : `${declaration.name}<${sample}>.${declaration.variants[0]?.name ?? "Variant"}(...)`;
+    const notes = [
+      `'${declaration.name}' declares ${parameters.length} type parameter${parameters.length === 1 ? "" : "s"}, and a value of it needs every one`,
+      `write them, as in \`${shape}\`, or give it a context that names them, such as a return type, an annotated binding, or a parameter`,
+      "Koda never infers a type argument from a field's or payload's value",
+    ];
+    if (found && found.kind !== "Error") {
+      notes.unshift(`this position expects ${typeName(found)}, which is not ${article(declaration.name)} ${declaration.name}`);
+    }
     this.diagnostics.add({
-      code: Codes.Unsupported,
-      message: "construction of generic '" + name + "' values is not available in Slice 2A",
+      code: Codes.TypeMismatch,
+      message: `this '${declaration.name}' has no type arguments`,
       span,
-      label: "generic construction is outside this slice",
-      notes: ["concrete applications are available in type positions only; construction spelling and inference are not implemented"],
+      label: `nothing here says what ${names} ${parameters.length === 1 ? "is" : "are"}`,
+      secondary: [{ span: declaration.nameSpan, message: `'${declaration.name}' is declared here` }],
+      notes,
     });
   }
 
-  private checkRecord(expression: Extract<Expression, { kind: "record" }>): IRExpression {
+  private checkRecord(
+    expression: Extract<Expression, { kind: "record" }>,
+    expected: KType | null,
+  ): IRExpression {
     const record = this.records.get(expression.typeName);
     if (!record) {
       const enumeration = this.enums.get(expression.typeName);
@@ -1565,8 +1894,14 @@ export class Checker {
       return this.errorValue(expression.span);
     }
 
-    if (record.typeParameters.length > 0) {
-      this.unsupportedGenericConstruction(record.name, expression.typeSpan);
+    const args = this.resolveConstructionArguments(
+      record,
+      expression.typeArguments,
+      expected,
+      expression.span,
+      expression.typeSpan,
+    );
+    if (args === null) {
       for (const field of expression.fields) this.checkExpression(field.value, null);
       return this.errorValue(expression.span);
     }
@@ -1585,8 +1920,8 @@ export class Checker {
       }
       seen.set(init.name, init.nameSpan);
 
-      const field = record.fieldsByName.get(init.name);
-      if (!field) {
+      const declared = record.fieldsByName.get(init.name);
+      if (!declared) {
         this.unknownMember(
           record.name,
           "field",
@@ -1600,8 +1935,18 @@ export class Checker {
         continue;
       }
 
-      const value = this.checkExpression(init.value, field.type);
-      this.expect(value, field.type, `'${field.name}' is declared ${typeName(field.type)}`);
+      // Slice 2A substitution supplies the instantiated type, so contextual
+      // literal typing keeps working through a type parameter (ADR 0008).
+      const field = instantiatedField(declared, record.id, args);
+      const fieldType = this.supportedMemberType(field.type, init.nameSpan);
+      if (fieldType.kind === "Error") {
+        this.checkExpression(init.value, ErrorType);
+        structurallyValid = false;
+        continue;
+      }
+
+      const value = this.checkExpression(init.value, fieldType);
+      this.expect(value, fieldType, `'${field.name}' is declared ${typeName(fieldType)}`);
       entries.push({ field, value });
     }
 
@@ -1625,7 +1970,7 @@ export class Checker {
     }
 
     if (!structurallyValid) return this.errorValue(expression.span);
-    return { kind: "record", declaration: record, entries, type: recordType(record), span: expression.span };
+    return { kind: "record", declaration: record, entries, type: recordType(record, args), span: expression.span };
   }
 
   /**
@@ -1633,10 +1978,13 @@ export class Checker {
    * variant when the target is an enum. The parser cannot tell those apart, so
    * the decision happens here against resolved symbols.
    */
-  private checkMember(expression: Extract<Expression, { kind: "member" }>): IRExpression {
+  private checkMember(
+    expression: Extract<Expression, { kind: "member" }>,
+    expected: KType | null = null,
+  ): IRExpression {
     if (expression.target.kind === "name" && !this.lookupLocal(expression.target.name)) {
       const enumeration = this.enums.get(expression.target.name);
-      if (enumeration) return this.checkVariant(enumeration, expression, null, expression.span);
+      if (enumeration) return this.checkVariant(enumeration, expression, null, expression.span, expected);
 
       const record = this.records.get(expression.target.name);
       if (record) {
@@ -1772,8 +2120,9 @@ export class Checker {
     member: Extract<Expression, { kind: "member" }>,
     args: readonly Expression[] | null,
     span: Span,
+    expected: KType | null = null,
   ): IRExpression {
-    if (this.resultDeclaration && declaration.id === this.resultDeclaration.id) {
+    if (this.resultDeclaration && sameDeclarationId(declaration.id, this.resultDeclaration.id)) {
       this.diagnostics.add({
         code: Codes.TypeMismatch,
         message: `'Result.${member.name}' is not how a Result is built`,
@@ -1784,8 +2133,14 @@ export class Checker {
       for (const argument of args ?? []) this.checkExpression(argument, null);
       return this.errorValue(span);
     }
-    if (declaration.typeParameters.length > 0) {
-      this.unsupportedGenericConstruction(declaration.name, span);
+    const typeArguments = this.resolveConstructionArguments(
+      declaration,
+      member.typeArguments,
+      expected,
+      span,
+      member.target.span,
+    );
+    if (typeArguments === null) {
       for (const argument of args ?? []) this.checkExpression(argument, null);
       return this.errorValue(span);
     }
@@ -1803,8 +2158,10 @@ export class Checker {
       return this.errorValue(span);
     }
 
-    const payload = variant.payload ?? [];
-    const type = enumType(declaration);
+    const declaredPayload = variant.payload ?? [];
+    // Slice 2A substitution supplies the instantiated payload types.
+    const payload = declaredPayload.map((field) => instantiatedField(field, declaration.id, typeArguments));
+    const type = enumType(declaration, typeArguments);
 
     if (args === null) {
       if (payload.length > 0) {
@@ -1837,12 +2194,20 @@ export class Checker {
     }
 
     const checked: IRExpression[] = [];
+    let payloadValid = true;
     for (const [index, argument] of args.entries()) {
       const field = payload[index];
-      const value = this.checkExpression(argument, field?.type ?? null);
-      if (field) this.expect(value, field.type, `'${field.name}' is declared ${typeName(field.type)}`);
+      const fieldType = field ? this.supportedMemberType(field.type, argument.span) : null;
+      if (field && fieldType!.kind === "Error") {
+        this.checkExpression(argument, ErrorType);
+        payloadValid = false;
+        continue;
+      }
+      const value = this.checkExpression(argument, fieldType);
+      if (field) this.expect(value, fieldType!, `'${field.name}' is declared ${typeName(fieldType!)}`);
       checked.push(value);
     }
+    if (!payloadValid) return this.errorValue(span);
     if (checked.length !== payload.length) return this.errorValue(span);
 
     return { kind: "variant", declaration, variant, args: checked, type, span };
@@ -1861,7 +2226,10 @@ export class Checker {
     if (expected && expected.kind === "Nullable") {
       return { kind: "null", type: expected, span };
     }
-    if (expected && expected.kind !== "Error") {
+    // An already-failed expectation absorbs, so a recovery path does not turn
+    // one error into two (types.ts: Error absorbs to suppress cascades).
+    if (expected && expected.kind === "Error") return this.errorValue(span);
+    if (expected) {
       this.diagnostics.add({
         code: Codes.TypeMismatch,
         message: `expected ${typeName(expected)}, found null`,
@@ -2080,6 +2448,86 @@ export class Checker {
     return this.errorValue(span);
   }
 
+  /**
+   * `items.length()`, `items.isEmpty()` and `items.get(index)` (Slice 5).
+   *
+   * These are compiler intrinsics rather than declared functions, so the
+   * checker fixes their signatures here and the IR keeps them out of the call
+   * path - a call transfers its arguments, which would discharge the receiver's
+   * whole collective responsibility on a single `get` (ADR 0010, R2).
+   */
+  private checkListOperation(
+    receiver: IRExpression,
+    callee: Extract<Expression, { kind: "member" }>,
+    expression: Extract<Expression, { kind: "call" }>,
+    span: Span,
+  ): IRExpression {
+    const element = this.isList(receiver.type) ? receiver.type.arguments[0] ?? ErrorType : ErrorType;
+    const name = callee.name;
+
+    if (name !== "length" && name !== "isEmpty" && name !== "get") {
+      this.unknownMember(typeName(receiver.type), "operation", name, callee.nameSpan, ["length", "isEmpty", "get"], callee.nameSpan);
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
+
+    if (callee.typeArguments !== null) {
+      this.diagnostics.add({
+        code: Codes.TypeArgumentCount,
+        message: `'${name}' does not accept type arguments`,
+        span,
+        label: "a list operation takes none",
+      });
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
+
+    const wanted = name === "get" ? 1 : 0;
+    if (expression.args.length !== wanted) {
+      this.diagnostics.add({
+        code: Codes.ArgumentCount,
+        message: `'${name}' takes ${wanted} argument${wanted === 1 ? "" : "s"}, but ${expression.args.length} ${expression.args.length === 1 ? "was" : "were"} given`,
+        span,
+        label: `this call passes ${expression.args.length}`,
+        notes: name === "get" ? ["write `items.get(index)`, where index is an Int"] : [`write \`items.${name}()\``],
+      });
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
+
+    if (name !== "get") {
+      const type = name === "length" ? IntType : BoolType;
+      return { kind: "list-op", operation: name, target: receiver, index: null, type, span };
+    }
+
+    const index = this.checkExpression(expression.args[0]!, IntType);
+    this.expect(index, IntType, "a list index is an Int");
+    if (index.type.kind === "Error" || element.kind === "Error") return this.errorValue(span);
+
+    // An index that names no element is an absent value, not a failed
+    // operation, so `get` is nullable rather than a Result (ADR 0007).
+    const type = this.supportedMemberType(nullableType(element), span);
+    if (type.kind === "Error") return this.errorValue(span);
+    return { kind: "list-op", operation: "get", target: receiver, index, type, span };
+  }
+
+  /** `value.name(...)` where `value` is not a list and holds no function. */
+  private checkNonListMemberCall(
+    receiver: IRExpression,
+    callee: Extract<Expression, { kind: "member" }>,
+    expression: Extract<Expression, { kind: "call" }>,
+  ): IRExpression {
+    this.diagnostics.add({
+      code: Codes.TypeMismatch,
+      message: `'${callee.name}' cannot be called`,
+      span: expression.span,
+      label: `${article(typeName(receiver.type))} ${typeName(receiver.type)} value has no operations`,
+      notes: ["Koda v0.1 has no first-class functions, so a field never holds one"],
+    });
+    for (const argument of expression.args) this.checkExpression(argument, null);
+    return this.errorValue(expression.span);
+  }
+
   private checkCall(
     expression: Extract<Expression, { kind: "call" }>,
     expected: KType | null = null,
@@ -2096,9 +2544,26 @@ export class Checker {
     // `Status.Paid(...)` is a variant construction rather than a function call.
     if (expression.callee.kind === "member") {
       const callee = expression.callee;
+
+      // Slice 5 list intrinsics. Checked before the variant path so a local
+      // holding a List is never mistaken for an enum name.
+      if (callee.target.kind !== "name" || this.lookupLocal(callee.target.name)) {
+        const receiver = this.checkExpression(callee.target, null);
+        if (this.isList(receiver.type)) {
+          return this.checkListOperation(receiver, callee, expression, expression.span);
+        }
+        if (receiver.type.kind !== "Error") {
+          return this.checkNonListMemberCall(receiver, callee, expression);
+        }
+        for (const argument of expression.args) this.checkExpression(argument, null);
+        return this.errorValue(expression.span);
+      }
+
       if (callee.target.kind === "name" && !this.lookupLocal(callee.target.name)) {
         const enumeration = this.enums.get(callee.target.name);
-        if (enumeration) return this.checkVariant(enumeration, callee, expression.args, expression.span);
+        if (enumeration) {
+          return this.checkVariant(enumeration, callee, expression.args, expression.span, expected);
+        }
       }
       this.checkMember(callee);
       this.diagnostics.add({
@@ -2159,6 +2624,13 @@ export class Checker {
       return this.errorValue(expression.span);
     }
 
+    // Slice 4A: type arguments are always written, never inferred.
+    const typeArguments = this.resolveCallTypeArguments(target, expression, name);
+    if (typeArguments === null) {
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      return this.errorValue(expression.span);
+    }
+
     if (expression.args.length !== target.parameters.length) {
       const wanted = target.parameters.length;
       const given = expression.args.length;
@@ -2171,17 +2643,85 @@ export class Checker {
       });
     }
 
+    // One checked declaration, substituted at the call. No instantiated symbol
+    // is created and no body is re-checked.
+    const instantiate = (type: KType, span: Span): KType =>
+      typeArguments.length === 0
+        ? type
+        : this.supportedMemberType(substitute(type, target.declarationId, typeArguments), span);
+
     const args: IRExpression[] = [];
     for (const [index, argument] of expression.args.entries()) {
       const parameter = target.parameters[index];
       // A parameter position supplies the expected type to a literal (ADR 0008).
-      const value = this.checkExpression(argument, parameter?.type ?? null);
-      if (parameter) this.expect(value, parameter.type, `'${parameter.name}' expects ${typeName(parameter.type)}`);
+      const expectedType = parameter ? instantiate(parameter.type, argument.span) : null;
+      const value = this.checkExpression(argument, expectedType);
+      if (parameter && expectedType) {
+        this.expect(value, expectedType, `'${parameter.name}' expects ${typeName(expectedType)}`);
+      }
       args.push(value);
     }
     if (args.length !== target.parameters.length) return this.errorValue(expression.span);
 
-    return { kind: "call", target, args, type: target.returnType, span: expression.span };
+    const returnType = instantiate(target.returnType, expression.span);
+    return { kind: "call", target, typeArguments, args, type: returnType, span: expression.span };
+  }
+
+  /**
+   * The written type arguments for a call (Slice 4A).
+   *
+   * They are always written: a generic function called without them is an
+   * error, never a request to infer. Returns null after reporting.
+   */
+  private resolveCallTypeArguments(
+    target: FunctionSymbol,
+    expression: Extract<Expression, { kind: "call" }>,
+    name: string,
+  ): readonly KType[] | null {
+    const declared = target.typeParameters.length;
+    const written = expression.typeArguments;
+
+    if (written === null) {
+      if (declared === 0) return [];
+      this.diagnostics.add({
+        code: Codes.TypeArgumentCount,
+        message: `'${name}' needs ${declared} type argument${declared === 1 ? "" : "s"}, and this call writes none`,
+        span: expression.span,
+        label: "supply every type argument explicitly",
+        secondary: [{ span: target.declarationSpan, message: `'${name}' is declared here` }],
+        notes: [
+          `write them before the arguments, as in \`${name}<${target.typeParameters.map(() => "Int").join(", ")}>(...)\``,
+          "Koda does not infer type arguments; they are always written",
+        ],
+      });
+      return null;
+    }
+
+    if (declared === 0) {
+      this.diagnostics.add({
+        code: Codes.TypeArgumentCount,
+        message: `'${name}' does not accept type arguments`,
+        span: expression.span,
+        label: "this function declares no type parameters",
+        secondary: [{ span: target.declarationSpan, message: `'${name}' is declared here` }],
+      });
+      return null;
+    }
+
+    if (written.length !== declared) {
+      this.diagnostics.add({
+        code: Codes.TypeArgumentCount,
+        message: `'${name}' expects ${declared} type argument${declared === 1 ? "" : "s"}, but received ${written.length}`,
+        span: expression.span,
+        label: "supply every type argument explicitly",
+        secondary: [{ span: target.declarationSpan, message: `'${name}' is declared here` }],
+        notes: ["type arguments cannot be omitted, inferred, defaulted or partially applied"],
+      });
+      return null;
+    }
+
+    const resolved = written.map((reference) => this.resolveType(reference, this.typeParameters));
+    return resolved.some((type) => type.kind === "Error") ? null : resolved;
   }
 
   private checkUnary(expression: Extract<Expression, { kind: "unary" }>, expected: KType | null): IRExpression {
@@ -2562,9 +3102,15 @@ export class Checker {
     return null;
   }
 
+  /** Presentation integration only; cyclic/invalid data never enter shape analysis. */
+  private hasResponsibility(type: KType): boolean {
+    if (!this.resultDeclaration || this.diagnostics.hasErrors) return this.isResultType(type);
+    return new Shapes(this.resultDeclaration.id).of(type).bears;
+  }
+
   private expect(value: IRExpression, expected: KType, label: string): void {
     if (isAssignable(value.type, expected)) return;
-    if (expected.kind === "Unit" && this.isResultType(value.type)) {
+    if (expected.kind === "Unit" && this.hasResponsibility(value.type)) {
       this.reportDiscardedResult(value.span, value.type);
       return;
     }
@@ -2601,7 +3147,8 @@ export class Checker {
 
   /** True for a direct `Result<T, E>`. */
   private isResultType(type: KType): boolean {
-    return type.kind === "Enum" && type.declaration.id === this.resultDeclaration?.id;
+    return type.kind === "Enum" && this.resultDeclaration !== null
+      && sameDeclarationId(type.declaration.id, this.resultDeclaration.id);
   }
 
   /**

@@ -15,6 +15,48 @@
  */
 import type { Span } from "../source/source.js";
 
+/**
+ * Identifies a declaration across a whole compilation (Q05-A).
+ *
+ * A bare per-checker counter was not enough: it restarts at 0 in every checker,
+ * so two modules' unrelated declarations would take the same number and
+ * `sameType` would call them nominally equal. The module component makes the
+ * identity safe before multi-source compilation exists to break it.
+ *
+ * Records, enums and functions all draw `local` from one per-module allocator,
+ * so any of them can own generic parameters. Identity is compiler-internal: it
+ * never reaches Koda source, diagnostics, emitted JavaScript or the runtime.
+ */
+export interface DeclarationId {
+  readonly module: number;
+  readonly local: number;
+}
+
+/** The canonical prelude module. `Result` lives here. */
+export const PRELUDE_MODULE_ID = 0;
+
+/**
+ * The single user module this compiler still compiles.
+ *
+ * Q05-B replaces this constant with a graph-wide allocator; nothing else about
+ * the representation changes when it does.
+ */
+export const ENTRY_MODULE_ID = 1;
+
+/**
+ * Structural equality. Identities are compared by value, never by reference,
+ * so two separately constructed `{ module: 1, local: 2 }` are the same
+ * declaration.
+ */
+export function sameDeclarationId(left: DeclarationId, right: DeclarationId): boolean {
+  return left.module === right.module && left.local === right.local;
+}
+
+/** A deterministic string key, for the maps and caches that need one. */
+export function declarationKey(id: DeclarationId): string {
+  return `${id.module}:${id.local}`;
+}
+
 /** A field of a record, or one named component of an enum variant payload. */
 export interface FieldSymbol {
   readonly name: string;
@@ -25,7 +67,7 @@ export interface FieldSymbol {
 }
 
 export interface RecordDeclaration {
-  readonly id: number;
+  readonly id: DeclarationId;
   readonly typeParameters: readonly TypeParameterSymbol[];
   readonly name: string;
   readonly nameSpan: Span;
@@ -47,7 +89,7 @@ export interface VariantSymbol {
 }
 
 export interface EnumDeclaration {
-  readonly id: number;
+  readonly id: DeclarationId;
   readonly typeParameters: readonly TypeParameterSymbol[];
   readonly name: string;
   readonly nameSpan: Span;
@@ -61,7 +103,7 @@ export type PrimitiveKind = "Bool" | "String" | "Int" | "Float" | "Unit" | "Neve
 
 /** A binder is identified by its declaration and source-order position, not spelling. */
 export interface TypeParameterSymbol {
-  readonly ownerId: number;
+  readonly ownerId: DeclarationId;
   readonly index: number;
   readonly name: string;
   readonly declarationSpan: Span;
@@ -146,19 +188,19 @@ export function sameType(left: KType, right: KType): boolean {
   if (left.kind !== right.kind) return false;
   if (left.kind === "Nullable" && right.kind === "Nullable") return sameType(left.inner, right.inner);
   if (left.kind === "TypeParameter" && right.kind === "TypeParameter") {
-    return left.parameter.ownerId === right.parameter.ownerId && left.parameter.index === right.parameter.index;
+    return sameDeclarationId(left.parameter.ownerId, right.parameter.ownerId) && left.parameter.index === right.parameter.index;
   }
   if ((left.kind === "Record" || left.kind === "Enum") && (right.kind === "Record" || right.kind === "Enum")) {
-    return left.declaration.id === right.declaration.id && left.arguments.length === right.arguments.length &&
+    return sameDeclarationId(left.declaration.id, right.declaration.id) && left.arguments.length === right.arguments.length &&
       left.arguments.every((argument, index) => sameType(argument, right.arguments[index]!));
   }
   return true;
 }
 
 /** Substitute only syntax-sized type trees; never expand declaration members. */
-export function substitute(type: KType, ownerId: number, args: readonly KType[]): KType {
+export function substitute(type: KType, ownerId: DeclarationId, args: readonly KType[]): KType {
   if (type.kind === "TypeParameter") {
-    return type.parameter.ownerId === ownerId ? args[type.parameter.index] ?? ErrorType : type;
+    return sameDeclarationId(type.parameter.ownerId, ownerId) ? args[type.parameter.index] ?? ErrorType : type;
   }
   if (type.kind === "Nullable") return nullableType(substitute(type.inner, ownerId, args));
   if (type.kind === "Record") return recordType(type.declaration, type.arguments.map((arg) => substitute(arg, ownerId, args)));
@@ -166,7 +208,7 @@ export function substitute(type: KType, ownerId: number, args: readonly KType[])
   return type;
 }
 
-export function instantiatedField(field: FieldSymbol, ownerId: number, args: readonly KType[]): FieldSymbol {
+export function instantiatedField(field: FieldSymbol, ownerId: DeclarationId, args: readonly KType[]): FieldSymbol {
   return { ...field, type: substitute(field.type, ownerId, args) };
 }
 

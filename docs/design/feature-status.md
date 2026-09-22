@@ -1,7 +1,7 @@
 # Feature status register
 
 Maturity and decision state describe the language, not the implementation. A
-compiler implementation now reaches [Slice 2A](../implementation/slice-2a.md);
+compiler implementation now reaches [Slice 3B](../implementation/slice-3b.md);
 a feature being implemented there does not change its row, and a row being
 ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principles and expressly approved decisions, including [Q11 / ADR 0007](../decisions/0007-q11-type-boundaries.md), [Q02 / ADR 0008](../decisions/0008-q02-numeric-semantics.md), and [Q03 / ADR 0009](../decisions/0009-q03-mutation-and-aliasing.md). Unresolved concrete semantics and delivery scope remain AWAITING DECISION. Approved deferrals have LATER maturity and an ACCEPTED decision state; their eventual designs are not selected. See [ordered proposals](open-questions.md) and the [review](specification-review.md).
 
@@ -25,17 +25,23 @@ ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principl
 | Explicit `Result<T, E>` for recoverable failure | ACCEPTED | ADR 0010; values, construction and matching implemented in Slice 2B | ACCEPTED |
 | Prelude payload names `Ok(value: T)` / `Err(error: E)`; unqualified positional constructors | ACCEPTED | ADR 0010 follow-up, 2026-09-21 | ACCEPTED |
 | Contextual Result construction, including through one outer nullable wrapper | ACCEPTED | Slice 2B; no general inference | ACCEPTED |
-| Result must-handle obligation enforcement | ACCEPTED | ADR 0010; implemented in Slice 2C for bindings whose own type is Result | ACCEPTED |
+| Result must-handle obligation enforcement | ACCEPTED | ADR 0010; direct bindings in Slice 2C; structural responsibility in Slice 3B | ACCEPTED |
 | Match discharge requires visible `Ok` and `Err` arms; wildcards do not discharge | ACCEPTED | ADR 0010 follow-up, 2026-09-21 | ACCEPTED |
 | Result parameters begin outstanding; binding transfers; overwrite rejected | ACCEPTED | ADR 0010 follow-up, 2026-09-21 | ACCEPTED |
-| Must-handle tracking through record fields and enum payloads | LATER | Known Slice 2C limitation, not a permitted discard | AWAITING DECISION |
+| Must-handle tracking through record fields and enum payloads | ACCEPTED | ADR 0010 follow-up; implemented in Slice 3B with receiver renewal and conditional presence | ACCEPTED |
 | Exhaustive pattern matching; associated-data enums | ACCEPTED | v0.1 | AWAITING DECISION |
 | Nominal identity for Koda-defined types | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Functions, lexical scopes, modules, explicit exports | EXPERIMENTAL | v0.1 | AWAITING DECISION |
 | Small invariant user-defined generics | ACCEPTED | v0.1; Q11 / ADR 0007 | ACCEPTED |
 | Generic record/enum declarations and concrete type applications | ACCEPTED | Slice 2A; declaration-local parameters, exact arity, substitution, nullable flattening, conservative recursion rejection | ACCEPTED |
-| Generic function/call syntax | ACCEPTED | Not implemented in Slice 2A | ACCEPTED spelling under Q01; not a complete inference contract |
-| Generic construction and generic-call inference details | EXPERIMENTAL | Outside Slice 2A; no temporary spelling or inference rule | AWAITING DECISION |
+| Generic value construction, explicit and contextual | ACCEPTED | Slice 3A; written arguments authoritative, otherwise taken from an expected type | ACCEPTED |
+| Contextual construction looks through exactly one outer nullable wrapper, for every generic type | ACCEPTED | ADR 0007 follow-up, 2026-09-21; generalizes the Slice 2B Result rule | ACCEPTED |
+| Generic argument inference from field or payload values | REJECTED | Slice 3A; construction without a complete expected type is rejected, never completed | ACCEPTED |
+| Generic function/call syntax | ACCEPTED | Implemented in Slice 4A: explicit declarations and explicit calls | ACCEPTED |
+| Explicit type arguments required at every generic call | ACCEPTED | Slice 4A; omission is an error, never inference | ACCEPTED |
+| Generic body checked once under abstract type parameters | ACCEPTED | Slice 4A; no monomorphisation, full erasure | ACCEPTED |
+| Conservative opaque responsibility for an unconstrained type parameter | ACCEPTED | ADR 0010 follow-up, 2026-09-22; `fn ignore<T>(x: T) -> Unit {}` rejected at its declaration | ACCEPTED |
+| Generic-call type-argument inference | LATER | Outside Slice 4A; explicit arguments are the accepted v0.1 surface | AWAITING DECISION |
 | Variance and advanced generic constraints | LATER | Deferred by Q11 | ACCEPTED deferral |
 | Checked signed-64-bit Int; binary64 Float; same semantics on every backend/build mode | ACCEPTED | v0.1; [Q02 semantics](../spec/numbers.md) | ACCEPTED |
 | Exact contextual literal typing; explicit typed numeric conversions and same-type comparisons | ACCEPTED | v0.1; Q02; spelling remains Q01 | ACCEPTED |
@@ -67,7 +73,15 @@ ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principl
 | Foreign declaration spelling and codecs | EXPERIMENTAL | Freeze v0.1 subset in Q06 | AWAITING DECISION |
 | Stable codes and structured diagnostics | EXPERIMENTAL | v0.1; ADR 0004 | AWAITING DECISION |
 | Formatter-owned canonical style | ACCEPTED | v0.1 after syntax freeze | AWAITING DECISION |
-| Collection library, iteration, closures | LATER | Add only with motivating cases | AWAITING DECISION |
+| Immutable `List<T>`, literals, `get`/`length`/`isEmpty`, `for` iteration | ACCEPTED | Slice 5; prelude type, no indexing syntax, no producers | ACCEPTED |
+| Out-of-range `get` returns `T?` | ACCEPTED | Slice 5; absence, not a failed operation | ACCEPTED |
+| `for`/`in` reserved words | ACCEPTED | Slice 5; intentional pre-1.0 source compatibility change | ACCEPTED |
+| Collective list responsibility; R1 normal completion, R2 read renews, R3 early return | ACCEPTED | ADR 0010 follow-up, 2026-09-22 | ACCEPTED |
+| Intrinsic list operations may know what user generics cannot | **PROVISIONAL** | Slice 5; must be revisited before a List stdlib, map/filter/reduce or user generic collection abstractions | AWAITING DECISION |
+| `append` and other list producers | LATER | Deferred from Slice 5; lists are built only by literal | AWAITING DECISION |
+| `break` / `continue` | LATER | Deferred; they create partial-iteration responsibility edges | AWAITING DECISION |
+| Indexing syntax `items[i]` | LATER | Deferred from Slice 5 | AWAITING DECISION |
+| Maps, sets, comprehensions, map/filter/reduce, closures | LATER | Add only with motivating cases; transformations need generic-effect design first | AWAITING DECISION |
 | Trait implementation, async runtime, database adapters | LATER | After v0.1 | AWAITING DECISION |
 | Registry publishing, dependency lifecycle scripts | LATER | Security and governance policy required | AWAITING DECISION |
 | Browser/native/Wasm targets, LSP, incremental compilation | LATER | Architecture should allow them | AWAITING DECISION |
@@ -80,3 +94,10 @@ ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principl
 | Macros, operator overloading, decorators in v0.1 | REJECTED | Insufficient need for initial complexity | AWAITING DECISION |
 
 Deferred accepted directions are intentionally not v0.1 promises. See the roadmap for the exact release boundary.
+
+### Accepted Slice 3B scope
+
+Structural Result responsibility with receiver renewal is ACCEPTED by explicit
+human authorization. Implementation is tracked in [Slice 3B](../implementation/slice-3b.md);
+all three stages must validate before the historical container gap is closed.
+Ownership, moves, global provenance, effects and Q08 changes remain excluded.

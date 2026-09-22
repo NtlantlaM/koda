@@ -30,9 +30,9 @@ describe("numeral magnitudes", () => {
   });
 
   test("keeps decimal numerals exact before any rounding", () => {
-    assert.deepEqual(decimalParts("1.5"), { mantissa: 15n, exponent: -1 });
-    assert.deepEqual(decimalParts("2e3"), { mantissa: 2n, exponent: 3 });
-    assert.deepEqual(decimalParts("1.25e-2"), { mantissa: 125n, exponent: -4 });
+    assert.deepEqual(decimalParts("1.5"), { mantissa: "15", exponent: -1n });
+    assert.deepEqual(decimalParts("2e3"), { mantissa: "2", exponent: 3n });
+    assert.deepEqual(decimalParts("1.25e-2"), { mantissa: "125", exponent: -4n });
   });
 });
 

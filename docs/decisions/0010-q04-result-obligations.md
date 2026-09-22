@@ -117,17 +117,17 @@ owed.
   bound present value has direct Result type and so acquires its own
   obligation.
 
-### Known enforcement limitation
+### Historical Slice 2C enforcement limitation
 
-Enforcement tracks a binding whose **own** type is `Result<T, E>` or
+Slice 2C enforcement tracked a binding whose **own** type is `Result<T, E>` or
 `Result<T, E>?`. Storing a Result into a record field or enum payload
 transfers the local obligation and tracking stops there, so a container
-holding an unhandled Result can currently be dropped without a diagnostic.
+holding an unhandled Result could then be dropped without a diagnostic.
 
 **This is an implementation limitation, not a permitted discard.** This
-decision still requires that failure be handled; the compiler does not yet
-prove it in that position. Closing the gap needs obligation tracking through
-containers, which is deliberately outside the accepted slice boundary.
+decision required that failure be handled; Slice 2C did not prove it in that
+position. Tracking through containers was outside its accepted boundary. The
+accepted Slice 3B follow-up below closes that historical gap.
 
 Introducing loops will likewise require extending the analysis to a fixpoint;
 the current language has none.
@@ -142,3 +142,171 @@ the current language has none.
 - automatic patch review/application UX
 - whole-program proof of eventual Result handling
 - affine/linear Result ownership
+
+## Accepted Slice 3B structural responsibility follow-up
+
+Accepted by explicit human Slice 3B authorization. These rules extend local
+responsibility through containers; they do not introduce ownership or moves.
+
+- Derive shapes from instantiated stored fields/payloads, never generic arguments
+  alone. Record paths are independent; enum payloads are variant-dependent.
+- Transfer retires outstanding responsibility at the selected source subtree.
+  Values remain readable. Receiving bindings, assignments, fields, payloads,
+  patterns, parameters and call results acquire fresh responsibility, including
+  when the source was already handled/transferred. There is no alias graph.
+- The earlier phrase "obligations are never duplicated" prohibits retaining the
+  transferred obligation at both ends; it does not prohibit independent receiver
+  renewal. Storing one Result twice creates two receiving responsibilities.
+- Handling the outer Result requires visible Ok/Err alternatives and does not
+  acknowledge nested Results in either payload. Wildcards preserve hidden
+  responsibility under the named source or an analysis-only temporary.
+- Nullable stages remain distinct from present payload responsibility. Known
+  absence has no contained responsibility, but does not remove the existing
+  requirement to acknowledge a Result? binding initialized with null.
+- Known enum constructions carry their actual alternative; unknown values retain
+  possible alternatives until matching. Impossible alternatives acquire no
+  phantom payload responsibilities.
+- Parameters acquire type-derived responsibility. Returns transfer outward;
+  callers renew from declared types, without handled-state effect summaries.
+- Temporary projections retain unselected responsibilities. Block/branch tails
+  transport their values; discarded calls and residuals are diagnosed.
+- Replacement evaluates/transfers the RHS before checking the old generation,
+  then installs a fresh generation. Every outstanding sibling prevents replacement.
+- A join retains responsibility outstanding on any continuing path where it
+  exists. Absence differs from handling. Both && and || respect skipped RHS paths.
+- This is a local guarantee, not global provenance or proof of eventual/exactly-once
+  handling. No ownership, borrowing, lifetimes, runtime state or Q08 choice follows.
+
+The container limitation above records Slice 2C history. Slice 3B closes it only
+after all execution-path, structural and conditional-payload stages validate.
+See [Slice 3B](../implementation/slice-3b.md).
+
+## 2026-09-22 — accepted abstract type-parameter responsibility (Slice 4A)
+
+Approver: repository owner/user, by explicit Slice 4A decision. This extends the
+must-handle rule to generic functions. It introduces no effect system and
+weakens nothing already accepted.
+
+### The problem this closes
+
+A generic body cannot see its type arguments. Before this decision an
+unconstrained type parameter carried no responsibility at all, while a call site
+discharged the caller by transferring each argument. A two-line generic wrapper
+would therefore have erased a Result's responsibility:
+
+```ko
+fn ignore<T>(x: T) -> Unit { }
+
+ignore<Result<Int, String>>(operation())    // responsibility lost
+```
+
+The non-generic equivalent is already rejected, so generic functions would have
+reopened, through a wrapper, exactly the reusable silent-discard escape this ADR
+forbids.
+
+### The accepted rule
+
+> A value whose type is an unconstrained type parameter carries an **opaque
+> responsibility**. It may be returned, passed onward, or stored in a field or
+> payload that preserves responsibility, under the ordinary transfer rules. It
+> **cannot be handled**, because an abstract type parameter cannot be matched.
+
+Consequences:
+
+- `fn identity<T>(x: T) -> T { x }` is accepted; the value is handed on by the
+  return.
+- `fn ignore<T>(x: T) -> Unit { }` is **rejected at its declaration**, once.
+- The rejection stands even where an instantiation would carry nothing, such as
+  `T = Int`. The conservative cost is accepted for v0.1.
+- Responsibility still flows only through **stored members**. `Phantom<T>` with
+  no fields carries nothing even at `Phantom<Result<Int, String>>`; `Box<T>`
+  carries its `value`; enum payloads stay variant-sensitive.
+- An outer `Result` and a potentially responsibility-bearing `T` inside it are
+  separate responsibilities, as in `fn wrap<T>(x: T) -> Result<T, E> { Ok(x) }`.
+- Receiver renewal is unchanged: reading a value twice produces two independent
+  responsibilities, both of which must be discharged.
+
+### Explicitly not introduced
+
+Obligation or effect summaries, call-site body summaries, polymorphic effect
+inference, ownership, moves, and runtime obligation tracking. The analysis stays
+local to one function and derives everything from declared types.
+
+### Reversibility
+
+This rule is conservative, so it can be relaxed later — by a more precise
+parametric model, or by a deliberate-ignore form — without weakening any
+guarantee that holds today. Starting permissive would not have been reversible.
+
+The diagnostic reuses `KODA-T0012` and explains that the value's type is an
+unconstrained type parameter, so Koda cannot tell whether it holds an outcome.
+It does not suggest matching the value.
+
+## 2026-09-22 — accepted collective responsibility for lists (Slice 5)
+
+Approver: repository owner/user, by explicit Slice 5 decision. This extends the
+must-handle rule to a variable-length collection. It introduces no effect
+system and weakens nothing already accepted.
+
+### The representation problem
+
+Structural responsibility enumerates statically known members: record fields by
+index, enum payloads by variant. A list has as many elements at runtime as it
+has, and no per-element key exists to enumerate.
+
+### The accepted representation
+
+> A list carries **one collective responsibility standing for all of its
+> elements**. It bears responsibility exactly when its element type does. A
+> finite literal and a list returned by a function use the same representation;
+> literal elements are never tracked as separate paths.
+
+Diagnostic paths render the collective element as `[]`, so a nested case reads
+`results[].value`.
+
+### The three rules
+
+**R1 — normal completion discharges.** A `for` loop visits every element, so a
+loop that reaches normal completion, with the binding discharged on every path
+that gets there, discharges the list's collective responsibility. An empty list
+discharges it vacuously, which is correct: there was nothing to visit.
+
+**R2 — reading one element does not discharge the list.** `get` renews a
+responsibility for the value it returns and leaves the list responsible for
+everything else. It is deliberately **not** modelled as a field-style transfer
+of a child, because that would discharge the whole collection on one read and
+silently lose every other element. `length()` and `isEmpty()` observe only
+collection metadata, inspect no element, and discharge nothing.
+
+**R3 — an early `return` discharges nothing.** Leaving a loop before normal
+completion proves nothing about the elements not yet visited, so the list
+remains outstanding on that path. This is why `break` and `continue` are
+deferred: they create the same partial-visit edge with a less obvious
+diagnostic.
+
+Repeated iteration renews on each read, exactly as every other repeated read
+already does. Responsibility is compiler accounting, not runtime identity, so
+two loops over one list must each account for what they read.
+
+### Provisional asymmetry — must be revisited
+
+Compiler-known list intrinsics may carry responsibility behaviour that a
+user-written generic function cannot express. `items.length()` is accepted on a
+`List<Result<…>>` receiver because the compiler knows it reads no element,
+while an identical user-written `fn count<T>(items: List<T>) -> Int` remains
+rejected under the Slice 4A abstract-parameter rule.
+
+**This asymmetry is PROVISIONAL v0.1 behaviour. It is not Koda's permanent
+generic-effect design.** It exists because an intrinsic comes with an
+implementation the compiler can reason about, and Koda currently offers users no
+way to state the same property.
+
+It **must** be revisited before any of:
+
+- a broad `List` standard library,
+- `map`, `filter`, `reduce` or similar transformations,
+- first-class or named-function transformation APIs,
+- significant user-defined generic collection abstractions.
+
+Slice 5 deliberately introduces no effect summaries, no does-not-consume
+annotations, no ownership, no moves and no polymorphic effect inference.

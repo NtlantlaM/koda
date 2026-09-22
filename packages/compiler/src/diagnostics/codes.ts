@@ -25,7 +25,7 @@ export const Codes = {
   UnsafeNullable: "KODA-T0002",
   /** Reassignment to an immutable binding; docs/spec/diagnostics.md. */
   ImmutableAssignment: "KODA-T0004",
-  /** Discarded Result expression; docs/spec/diagnostics.md. */
+  /** Discarded Result-bearing expression or temporary residual; docs/spec/diagnostics.md. */
   DiscardedResult: "KODA-T0005",
   /** CANDIDATE. Wrong number of call arguments. */
   ArgumentCount: "KODA-T0006",
@@ -39,9 +39,9 @@ export const Codes = {
   UnreachableArm: "KODA-T0010",
   /** CANDIDATE. Wrong number of type arguments, including an unapplied generic. */
   TypeArgumentCount: "KODA-T0011",
-  /** CANDIDATE. An outstanding Result leaves its scope unhandled. */
+  /** CANDIDATE. An outstanding structural responsibility leaves scope unhandled. */
   OutstandingResult: "KODA-T0012",
-  /** CANDIDATE. An outstanding Result is overwritten before being handled. */
+  /** CANDIDATE. An old-generation structural responsibility is overwritten. */
   OverwrittenResult: "KODA-T0013",
   /** Module resolution failure; docs/spec/diagnostics.md. */
   ModuleResolution: "KODA-M0001",

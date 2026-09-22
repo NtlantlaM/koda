@@ -58,6 +58,8 @@ export class Lexer {
   private readonly endIndex: number;
   /** Depth of () and [] delimiters; newlines inside them are not significant. */
   private groupDepth = 0;
+  /** Braces restore statement/list layout; closing them restores the outer group. */
+  private readonly braceGroups: number[] = [];
 
   constructor(file: SourceFile, diagnostics: DiagnosticBag, startIndex = 0, endIndex?: number) {
     this.file = file;
@@ -169,6 +171,11 @@ export class Lexer {
         for (let i = 0; i < punct.length; i += 1) this.advance();
         if (punct === "(" || punct === "[") this.groupDepth += 1;
         if (punct === ")" || punct === "]") this.groupDepth = Math.max(0, this.groupDepth - 1);
+        if (punct === "{") {
+          this.braceGroups.push(this.groupDepth);
+          this.groupDepth = 0;
+        }
+        if (punct === "}") this.groupDepth = this.braceGroups.pop() ?? 0;
         return { kind: "punct", text: punct, span: this.span(startByte) };
       }
     }

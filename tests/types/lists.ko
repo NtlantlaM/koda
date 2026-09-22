@@ -1,0 +1,64 @@
+// Slice 5: list typing rules. One rejection per function.
+type User { name: String }
+
+fn heterogeneous() -> Unit { xs = [1, "a"] }
+
+fn notAWholeNumber() -> Unit { xs = [1, 2.5] }
+
+fn unconstrainedEmpty() -> Unit { xs = [] }
+
+fn wrongArity(xs: List<Int, String>) -> Unit { }
+
+fn unappliedList(xs: List) -> Unit { }
+
+fn iterateNonList() -> Unit {
+    for x in 42 {
+        nothing()
+    }
+}
+
+fn iterateRecord(u: User) -> Unit {
+    for x in u {
+        nothing()
+    }
+}
+
+fn indexNotInt() -> Unit {
+    xs = [1]
+    y = xs.get("a")
+}
+
+fn unknownOperation() -> Unit {
+    xs = [1]
+    y = xs.nope()
+}
+
+fn lengthTakesNothing() -> Unit {
+    xs = [1]
+    y = xs.length(3)
+}
+
+fn getNeedsAnIndex() -> Unit {
+    xs = [1]
+    y = xs.get()
+}
+
+fn loopBindingShadows(x: Int) -> Unit {
+    for x in [1] {
+        nothing()
+    }
+}
+
+fn loopBindingIsReserved() -> Unit {
+    for Result in [1] {
+        nothing()
+    }
+}
+
+fn loopProducesNoValue() -> Int {
+    for x in [1] {
+        nothing()
+    }
+}
+
+fn nothing() -> Unit { }

@@ -1,0 +1,138 @@
+// Slice 3A: every accepted way to build a generic value, run for real.
+import { print } from "koda:io"
+
+type Box<T> { value: T }
+type Pair<A, B> { left: A, right: B }
+type MaybeBox<T> { value: T? }
+enum Wrap<T> { Has(value: T), None }
+
+fn explicitRecord() -> Box<Int> {
+    Box<Int> { value: 42 }
+}
+
+fn contextualRecord() -> Box<Int> {
+    Box { value: 7 }
+}
+
+fn nullableContextual() -> Box<Int>? {
+    Box { value: 9 }
+}
+
+fn annotatedBinding() -> Int {
+    annotated: Box<Int> = Box { value: 11 }
+    annotated.value
+}
+
+fn contextualReturn() -> Box<String> {
+    return Box { value: "returned" }
+}
+
+fn explicitVariant() -> Wrap<Int> {
+    Wrap<Int>.Has(13)
+}
+
+fn contextualVariant() -> Wrap<Int> {
+    Wrap.Has(17)
+}
+
+fn emptyVariant() -> Wrap<Int> {
+    Wrap.None
+}
+
+fn nestedExplicit() -> Box<Box<Int>> {
+    Box<Box<Int>> { value: Box<Int> { value: 19 } }
+}
+
+fn nestedContextualInner() -> Box<Box<Int>> {
+    Box<Box<Int>> { value: Box { value: 23 } }
+}
+
+fn deeplyNested() -> Box<Box<Box<Int>>> {
+    Box<Box<Box<Int>>> { value: Box { value: Box { value: 29 } } }
+}
+
+fn nullableArgument() -> MaybeBox<Int> {
+    MaybeBox<Int> { value: null }
+}
+
+fn presentNullableArgument() -> MaybeBox<Int> {
+    MaybeBox { value: 31 }
+}
+
+fn recordInsidePayload() -> Wrap<Box<Int>> {
+    Wrap.Has(Box { value: 37 })
+}
+
+fn twoParameters() -> Pair<Int, String> {
+    Pair { left: 41, right: "two" }
+}
+
+fn retargetedLiteral() -> Box<Float> {
+    Box<Float> { value: 1 }
+}
+
+fn consume(box: Box<Int>) -> Int {
+    box.value
+}
+
+fn asArgument() -> Int {
+    consume(Box { value: 43 })
+}
+
+fn describeWrap(wrapped: Wrap<Int>) -> String {
+    match wrapped {
+        Wrap.Has(value) => "has {value}"
+        Wrap.None => "none"
+    }
+}
+
+fn describeMaybe(maybe: MaybeBox<Int>) -> String {
+    inner = maybe.value
+    match inner {
+        null => "absent"
+        present => "present {present}"
+    }
+}
+
+fn rebound() -> Int {
+    mut box = Box<Int> { value: 47 }
+    box = Box { value: 53 }
+    box.value
+}
+
+fn nullablePresence() -> String {
+    made = nullableContextual()
+    match made {
+        null => "absent"
+        present => "boxed {present.value}"
+    }
+}
+
+export fn main() -> Unit {
+    print("{explicitRecord().value}")
+    print("{contextualRecord().value}")
+    print(nullablePresence())
+    print("{annotatedBinding()}")
+    print(contextualReturn().value)
+    print(describeWrap(explicitVariant()))
+    print(describeWrap(contextualVariant()))
+    print(describeWrap(emptyVariant()))
+    print("{nestedExplicit().value.value}")
+    print("{nestedContextualInner().value.value}")
+    print("{deeplyNested().value.value.value}")
+    print(describeMaybe(nullableArgument()))
+    print(describeMaybe(presentNullableArgument()))
+    print(describeWrap(Wrap.Has(59)))
+    print("{twoParameters().left} {twoParameters().right}")
+    print("{retargetedLiteral().value}")
+    print("{asArgument()}")
+    print("{rebound()}")
+    print("{recordInsidePayload2()}")
+}
+
+fn recordInsidePayload2() -> Int {
+    match recordInsidePayload() {
+        Wrap.Has(box) => box.value
+        Wrap.None => 0
+    }
+}

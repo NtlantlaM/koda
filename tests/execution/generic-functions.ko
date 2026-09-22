@@ -1,0 +1,119 @@
+// Slice 4A: every accepted generic function shape, run for real.
+import { print } from "koda:io"
+
+type Box<T> { value: T }
+type Pair<A, B> { first: A, second: B }
+enum Option<T> { None, Some(value: T) }
+
+fn identity<T>(value: T) -> T {
+    value
+}
+
+fn box<T>(value: T) -> Box<T> {
+    Box<T> { value: value }
+}
+
+fn unbox<T>(container: Box<T>) -> T {
+    container.value
+}
+
+fn pair<A, B>(a: A, b: B) -> Pair<A, B> {
+    Pair<A, B> { first: a, second: b }
+}
+
+fn swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
+    Pair<B, A> { first: p.second, second: p.first }
+}
+
+fn some<T>(value: T) -> Option<T> {
+    Option<T>.Some(value)
+}
+
+fn none<T>() -> Option<T> {
+    Option<T>.None
+}
+
+// A generic body discharges a T only by handing it on. There is deliberately no
+// way to write `fn f<T>(x: T) -> Unit`, no way to inspect a T and return only a
+// summary, and no way to accept two Ts and return one: in each case a
+// responsibility would be abandoned. Every generic function below hands on
+// every T it receives.
+fn consume<T>(value: T) -> Box<T> {
+    stored = Box<T> { value: value }
+    rebound = stored
+    rebound
+}
+
+fn relay<T>(value: T) -> Box<Box<T>> {
+    Box<Box<T>> { value: consume<T>(value) }
+}
+
+// Matching a generic enum binds a T, so each arm hands it back.
+fn rebuild<T>(option: Option<T>) -> Option<T> {
+    match option {
+        Option.Some(inner) => Option<T>.Some(inner)
+        Option.None => Option<T>.None
+    }
+}
+
+fn isPresent<T>(option: Option<T>) -> Pair<Option<T>, Bool> {
+    match option {
+        Option.Some(inner) => Pair<Option<T>, Bool> { first: Option<T>.Some(inner), second: true }
+        Option.None => Pair<Option<T>, Bool> { first: Option<T>.None, second: false }
+    }
+}
+
+// Generic calling generic, with distinct owners.
+fn forward<U>(x: U) -> U {
+    identity<U>(x)
+}
+
+// Explicit recursive instantiation.
+fn repeat<T>(value: T, times: Int) -> T {
+    if times > 0 {
+        repeat<T>(value, times - 1)
+    } else {
+        value
+    }
+}
+
+// Nullable return through a type parameter.
+fn maybe<T>(value: T) -> T? {
+    value
+}
+
+// A substituted expectation drives Slice 3A contextual construction.
+fn widen<T>(container: Box<T>) -> Box<T> {
+    container
+}
+
+fn nested<T>(value: T) -> Box<Box<T>> {
+    Box<Box<T>> { value: Box<T> { value: value } }
+}
+
+fn yesNo(flag: Bool) -> String {
+    if flag { "present" } else { "absent" }
+}
+
+fn presence(value: Int?) -> String {
+    match value {
+        null => "absent"
+        present => "present {present}"
+    }
+}
+
+export fn main() -> Unit {
+    print("{identity<Int>(42)}")
+    print(identity<String>("koda"))
+    print("{unbox<Int>(box<Int>(7))}")
+    print("{pair<String, Int>("age", 41).second}")
+    print(swap<Int, String>(pair<Int, String>(1, "one")).first)
+    print(yesNo(isPresent<Int>(rebuild<Int>(some<Int>(3))).second))
+    print(yesNo(isPresent<Int>(none<Int>()).second))
+    print("{unbox<Box<Int>>(relay<Int>(23)).value}")
+    print("{forward<Int>(5)}")
+    print("{repeat<Int>(9, 4)}")
+    print(presence(maybe<Int>(11)))
+    print("{unbox<Int>(widen<Int>(Box { value: 13 }))}")
+    print("{unbox<Int>(unbox<Box<Int>>(nested<Int>(17)))}")
+}

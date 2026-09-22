@@ -1,0 +1,45 @@
+// Slice 3C: accepted operand order and nested-block layout, not new syntax.
+import { print } from "koda:io"
+
+type Pair<T> { first: T, second: Unit }
+enum Duo { Both(first: Int, second: Unit) }
+fn first(a: Int, b: Unit) -> Int { a }
+fn id(value: Int) -> Int { value }
+
+export fn main() -> Unit {
+    mut x = 1
+    y = first(x, if true { x = 2 } else {})
+    print("argument {y}")
+
+    x = 3
+    p = Pair<Int> {
+        first: x
+        second: if true { x = 4 } else {}
+    }
+    print("record {p.first}")
+
+    x = 5
+    d = Duo.Both(x, if true { x = 6 } else {})
+    match d { Duo.Both(a, _) => { print("enum {a}") } }
+
+    nested = id(if true {
+        inner = id(if true {
+            local = 7
+            local
+        } else { 0 })
+        inner
+    } else { 0 })
+    print("nested {nested}")
+
+    x = 8
+    r: Result<Int,String> = Ok(first(x, if true { x = 9 } else {}))
+    match r { Ok(value) => { print("result {value}") }, Err(_) => {} }
+
+    x = 10
+    print("interpolation {x}:{first(0, if true { x = 11 } else {})}")
+
+    huge: Float = 1e999999999999999999999999999999999999999999999999999
+    tiny: Float = -1e-999999999999999999999999999999999999999999999999999
+    exact: Int = 100000000000000000000000000000000000000000000000000e-50
+    print("numeric {huge}:{tiny}:{exact}")
+}

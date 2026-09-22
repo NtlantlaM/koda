@@ -26,8 +26,14 @@ adds generic data declarations and type applications, and
 constructors and matching, and
 [slice 2C](docs/implementation/slice-2c.md) enforces Result's must-handle rule:
 a Result may not be discarded, abandoned at a scope exit or overwritten before
-someone has looked at it. Generic
-construction, generic functions/calls/inference, multi-module programs and npm
+someone has looked at it. [Slice 3A](docs/implementation/slice-3a.md) adds
+generic value construction, explicit and contextual, so a user-defined generic
+type can finally hold a value. [Slice 3B](docs/implementation/slice-3b.md) adds structural Result responsibility, receiver renewal and conditional payload tracking. [Slice 4A](docs/implementation/slice-4a.md)
+adds explicit generic functions and explicit generic calls, with type arguments
+always written. [Slice 5](docs/implementation/slice-5.md) adds an immutable
+`List<T>` with literals, `get`/`length`/`isEmpty` and `for` iteration.
+Type-argument inference, list producers such as `append`, recursive data,
+multi-module programs and npm
 interop are **not** implemented. There
 is no formatter, test runner or package manager. Some `examples/` programs use
 constructs the slices do not cover; `examples/README.md` says which ones run.
@@ -48,6 +54,7 @@ constructs the slices do not cover; `examples/README.md` says which ones run.
 - [Compiler slice 2A - generic data-type foundations](docs/implementation/slice-2a.md)
 - [Compiler slice 2B - Result values and matching](docs/implementation/slice-2b.md)
 - [Compiler slice 2C - Result must-handle analysis](docs/implementation/slice-2c.md)
+- [Compiler slice 3A - generic value construction](docs/implementation/slice-3a.md)
 
 ## Repository map
 
@@ -82,3 +89,6 @@ node packages/cli/dist/src/main.js run tests/execution/hello.ko
 Contribute through [the design contribution guide](CONTRIBUTING.md). There is no
 installable release, and the command surface above is provisional pending Q05
 and Q07.
+
+Structural Result tracking is implemented in [Slice 3B](docs/implementation/slice-3b.md):
+local responsibility through containers, with receiver renewal and no ownership.

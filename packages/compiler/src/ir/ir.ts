@@ -9,7 +9,7 @@
  * source-located arithmetic faults.
  */
 import type { Span } from "../source/source.js";
-import type { EnumDeclaration, FieldSymbol, KType, RecordDeclaration, VariantSymbol } from "../check/types.js";
+import type { DeclarationId, EnumDeclaration, FieldSymbol, KType, RecordDeclaration, TypeParameterSymbol, VariantSymbol } from "../check/types.js";
 
 export interface LocalSymbol {
   readonly id: number;
@@ -26,6 +26,14 @@ export type FunctionOrigin =
 
 export interface FunctionSymbol {
   readonly id: number;
+  /**
+   * Q05-A: the function's declaration identity, from the same per-module
+   * allocator records and enums use. It exists so a function can own generic
+   * parameters in Slice 4A; nothing reads it yet.
+   */
+  readonly declarationId: DeclarationId;
+  /** `fn identity<T>(...)`; empty for an ordinary function (Slice 4A). */
+  readonly typeParameters: readonly TypeParameterSymbol[];
   readonly name: string;
   readonly parameters: readonly LocalSymbol[];
   readonly returnType: KType;
@@ -66,7 +74,21 @@ export interface IRReturn {
   readonly span: Span;
 }
 
-export type IRStatement = IRDeclare | IRAssign | IREval | IRReturn;
+/**
+ * `for binding in iterable { body }` (Slice 5).
+ *
+ * The body is analysed once. Flows that reach its end are the loop's normal
+ * completion edge, which is the only place the iterable's collective element
+ * responsibility may be discharged (ADR 0010, R1/R3).
+ */
+export interface IRFor extends IRNode {
+  readonly kind: "for";
+  readonly binding: LocalSymbol;
+  readonly iterable: IRExpression;
+  readonly body: IRBlock;
+}
+
+export type IRStatement = IRDeclare | IRAssign | IREval | IRReturn | IRFor;
 
 interface IRNode {
   readonly type: KType;
@@ -116,9 +138,40 @@ export interface IRLocalRef extends IRNode {
   readonly symbol: LocalSymbol;
 }
 
+/** `[a, b, c]`. Elements evaluate left to right, exactly once each. */
+export interface IRList extends IRNode {
+  readonly kind: "list";
+  readonly elements: readonly IRExpression[];
+}
+
+/** The list operations the compiler knows: `length`, `isEmpty`, `get`. */
+export type ListOperation = "length" | "isEmpty" | "get";
+
+/**
+ * A compiler-known list operation (Slice 5).
+ *
+ * Deliberately not an `IRCall`: a call transfers its arguments, which would
+ * discharge the receiver's whole collective responsibility on a single `get`.
+ * A separate node lets the obligation pass read the receiver without consuming
+ * it (ADR 0010, R2).
+ */
+export interface IRListOp extends IRNode {
+  readonly kind: "list-op";
+  readonly operation: ListOperation;
+  readonly target: IRExpression;
+  /** Present only for `get`. */
+  readonly index: IRExpression | null;
+}
+
 export interface IRCall extends IRNode {
   readonly kind: "call";
   readonly target: FunctionSymbol;
+  /**
+   * Resolved type arguments, parallel to `target.typeParameters`. Present for
+   * the obligation pass; the emitter ignores them, because type arguments have
+   * no runtime representation.
+   */
+  readonly typeArguments: readonly KType[];
   readonly args: readonly IRExpression[];
 }
 
@@ -293,6 +346,8 @@ export type IRExpression =
   | IRBoolConst
   | IRLocalRef
   | IRCall
+  | IRList
+  | IRListOp
   | IRIntArith
   | IRIntNegate
   | IRFloatArith
@@ -323,8 +378,11 @@ export interface IRModule {
   /** The exported `main` entry, when the module declares one. */
   readonly entry: FunctionSymbol | null;
   /**
-   * Declaration id of the prelude `Result`, so the obligation pass can
-   * recognise it without re-deriving the prelude.
+   * Declaration identity of the prelude `Result`, so the obligation pass can
+   * recognise it without re-deriving the prelude. Canonical across the whole
+   * compilation since Q05-A.
    */
-  readonly resultDeclarationId: number | null;
+  readonly resultDeclarationId: DeclarationId | null;
+  /** Declaration identity of the prelude `List`, for the collective element shape. */
+  readonly listDeclarationId: DeclarationId | null;
 }

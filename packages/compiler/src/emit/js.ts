@@ -183,6 +183,19 @@ class Emitter {
         this.push(`return ${this.lowerValue(statement.value)};`);
         return;
       }
+      case "for": {
+        // `for...of` preserves order, handles an empty list, and keeps a Koda
+        // `return` inside the loop belonging to the enclosing function - which
+        // is why no IIFE is used here.
+        const iterable = this.lowerValue(statement.iterable);
+        this.push(`for (const ${jsName(statement.binding)} of ${iterable}) {`);
+        this.indent += 1;
+        this.emitBlockStatements(statement.body);
+        if (statement.body.tail) this.emitForEffect(statement.body.tail);
+        this.indent -= 1;
+        this.push("}");
+        return;
+      }
       case "eval":
         this.emitForEffect(statement.value);
     }
@@ -254,6 +267,11 @@ class Emitter {
         return Emitter.needsStatements(expression.operand);
       case "call":
         return expression.args.some((argument) => Emitter.needsStatements(argument));
+      case "list":
+        return expression.elements.some((element) => Emitter.needsStatements(element));
+      case "list-op":
+        return Emitter.needsStatements(expression.target)
+          || (expression.index !== null && Emitter.needsStatements(expression.index));
       case "interpolate":
         return expression.parts.some((part) => part.kind === "value" && Emitter.needsStatements(part.value));
       case "record":
@@ -281,7 +299,9 @@ class Emitter {
     for (const [index, expression] of expressions.entries()) {
       let value = this.lowerValue(expression);
       const laterEmits = expressions.slice(index + 1).some((later) => Emitter.needsStatements(later));
-      if (laterEmits && !IDENTIFIER.test(value)) value = this.bindTemp(value);
+      // Even an identifier can name a mutable local that later statements
+      // rebind. Capture the value now, not merely effectful-looking JS text.
+      if (laterEmits) value = this.bindTemp(value);
       values.push(value);
     }
     return values;
@@ -299,6 +319,26 @@ class Emitter {
         return expression.value ? "true" : "false";
       case "local":
         return jsName(expression.symbol);
+
+      case "list": {
+        // A JavaScript array literal evaluates its elements in written order,
+        // so left-to-right evaluation survives without extra machinery. Lists
+        // are semantically immutable; nothing mutates them, so nothing is
+        // frozen (the same reasoning records already rely on).
+        return `[${this.lowerOperands(expression.elements).join(", ")}]`;
+      }
+
+      case "list-op": {
+        if (expression.operation === "get") {
+          const operands = this.lowerOperands([expression.target, expression.index!]);
+          // Out of range must be Koda's absence, never JavaScript's undefined.
+          return `${RUNTIME}.listGet(${operands[0]!}, ${operands[1]!})`;
+        }
+        const target = this.lowerValue(expression.target);
+        return expression.operation === "length"
+          ? `BigInt(${target}.length)`
+          : `(${target}.length === 0)`;
+      }
 
       case "call": {
         const args = this.lowerOperands(expression.args).join(", ");

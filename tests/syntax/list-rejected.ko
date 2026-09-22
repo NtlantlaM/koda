@@ -1,0 +1,27 @@
+// Slice 5: malformed list literals and loop headers must recover
+// deterministically, without cascades or a crash.
+fn unseparatedItems() -> Unit {
+    xs = [1 2]
+}
+
+fn missingItemName() -> Unit {
+    for in [1] {
+    }
+}
+
+fn missingIn() -> Unit {
+    for x [1] {
+    }
+}
+
+fn breakDeferred() -> Unit {
+    for x in [1] {
+        break
+    }
+}
+
+fn continueDeferred() -> Unit {
+    for x in [1] {
+        continue
+    }
+}

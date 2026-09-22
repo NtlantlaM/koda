@@ -1,0 +1,65 @@
+// Slice 5: accepted list and loop layouts. Everything here compiles; the point
+// is that brackets group, commas separate, and nothing else regresses.
+type User { name: String }
+
+fn nothing() -> Unit { }
+
+fn layouts() -> Int {
+    empty: List<Int> = []
+    single = [1]
+    trailing = [1, 2,]
+    multiline = [
+        1,
+        2,
+    ]
+    nestedMultiline = [
+        [1, 2],
+        [3, 4],
+    ]
+    records = [
+        User { name: "Thandi" },
+        User { name: "Kagiso" },
+    ]
+    single.length() + trailing.length() + multiline.length() + nestedMultiline.length() + records.length() + empty.length()
+}
+
+fn loops(items: List<Int>) -> Unit {
+    for item in items {
+        nothing()
+    }
+
+    for outer in [[1], [2]] {
+        for inner in outer {
+            nothing()
+        }
+    }
+
+    for item in items {
+        if item > 0 {
+            nothing()
+        } else {
+            nothing()
+        }
+    }
+}
+
+// A record literal is restricted in a loop head, as in `if` and `match`.
+fn headRestriction(users: List<User>) -> Unit {
+    for u in users {
+        nothing()
+    }
+    for u in (users) {
+        nothing()
+    }
+}
+
+// Comparisons, generic calls and generic construction are unaffected.
+fn identity<T>(x: T) -> T { x }
+type Box<T> { value: T }
+
+fn regressions(a: Int, b: Int) -> Bool {
+    less = a < b
+    boxed = Box<Int> { value: identity<Int>(1) }
+    inHead = if a < b { 1 } else { 2 }
+    less && boxed.value == inHead
+}

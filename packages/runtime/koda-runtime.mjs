@@ -131,6 +131,20 @@ export function ftext(value) {
 }
 
 /**
+ * `items.get(index)`: the element, or Koda's absence when the index names none.
+ *
+ * JavaScript yields `undefined` for an out-of-range read, and `undefined` is
+ * how Unit is represented, not absence. Every index that names no element -
+ * negative ones included - is absence, so this helper normalises to `null`.
+ * Lists are semantically immutable and are not frozen; nothing mutates them.
+ * @param {unknown[]} items @param {bigint} index @returns {unknown}
+ */
+export function listGet(items, index) {
+  if (index < 0n || index >= BigInt(items.length)) return null;
+  return items[Number(index)];
+}
+
+/**
  * `print` from "koda:io": writes a String followed by a newline, returns Unit.
  * @param {string} value @returns {void}
  */

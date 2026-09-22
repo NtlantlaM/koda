@@ -32,6 +32,8 @@ export interface FunctionDecl {
   readonly exported: boolean;
   readonly name: string;
   readonly nameSpan: Span;
+  /** `fn identity<T>(...)`. Empty when the function declares none (Slice 4A). */
+  readonly typeParameters: readonly TypeParameterDecl[];
   readonly parameters: readonly Parameter[];
   readonly returnType: TypeRef;
   readonly body: Block;
@@ -135,7 +137,22 @@ export interface ExpressionStatement {
   readonly span: Span;
 }
 
-export type Statement = BindStatement | ReturnStatement | ExpressionStatement;
+/**
+ * `for binding in iterable { body }` (Slice 5).
+ *
+ * A statement, never a value. The iterable is parsed as a control head, so a
+ * direct record literal is restricted there as in `if` and `match`.
+ */
+export interface ForStatement {
+  readonly kind: "for";
+  readonly name: string;
+  readonly nameSpan: Span;
+  readonly iterable: Expression;
+  readonly body: Block;
+  readonly span: Span;
+}
+
+export type Statement = BindStatement | ReturnStatement | ExpressionStatement | ForStatement;
 
 export interface NumberLiteral {
   readonly kind: "number";
@@ -184,6 +201,11 @@ export interface CallExpression {
   readonly kind: "call";
   /** A plain name, or a member access such as `PaymentStatus.Paid`. */
   readonly callee: NameExpression | MemberExpression;
+  /**
+   * `identity<Int>(42)`. null means none were written; Slice 4A never infers
+   * them, so a generic call without them is an error rather than a request.
+   */
+  readonly typeArguments: readonly TypeRef[] | null;
   readonly args: readonly Expression[];
   readonly span: Span;
 }
@@ -201,6 +223,13 @@ export interface MemberExpression {
   readonly target: Expression;
   readonly name: string;
   readonly nameSpan: Span;
+  /**
+   * Type arguments written on the target, as in `Wrap<Int>.Has(42)`. Meaningful
+   * only when `target` is a name that resolves to a generic enum; the checker
+   * decides, because the grammar must not consult a symbol table (ADR 0011).
+   * null means none were written.
+   */
+  readonly typeArguments: readonly TypeRef[] | null;
   readonly span: Span;
 }
 
@@ -223,7 +252,27 @@ export interface RecordExpression {
   readonly kind: "record";
   readonly typeName: string;
   readonly typeSpan: Span;
+  /**
+   * Type arguments written at the construction site, as in
+   * `Box<Int> { value: 42 }`. null means none were written, in which case the
+   * expected type supplies them (Slice 3A). An empty array preserves a written
+   * `Box<>`, which is invalid.
+   */
+  readonly typeArguments: readonly TypeRef[] | null;
   readonly fields: readonly FieldInit[];
+  readonly span: Span;
+}
+
+/**
+ * `[a, b, c]` (Slice 5).
+ *
+ * Brackets are a grouping delimiter, so elements are comma-separated and a
+ * newline inside them is not a separator. An empty list has no element type of
+ * its own; the expected type supplies one.
+ */
+export interface ListExpression {
+  readonly kind: "list";
+  readonly elements: readonly Expression[];
   readonly span: Span;
 }
 
@@ -378,5 +427,6 @@ export type Expression =
   | ParenExpression
   | MemberExpression
   | RecordExpression
+  | ListExpression
   | MatchExpression
   | ErrorExpression;

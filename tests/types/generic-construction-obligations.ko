@@ -1,0 +1,35 @@
+// Slice 3B closes the container gap exercised by this Slice 3A fixture.
+// Direct obligations stay enforced; generic stored members now carry duties.
+type Holder<T> { outcome: T }
+
+fn make() -> Result<Int, String> { Ok(1) }
+
+// Still enforced, exactly as before generic construction existed.
+fn stillOutstanding() -> Unit { r = make() }
+
+fn stillOverwritten() -> Unit {
+    mut r = make()
+    r = make()
+    match r { Ok(_) => {}, Err(_) => {} }
+}
+
+fn wildcardStillDoesNotDischarge() -> Unit {
+    r = make()
+    match r { Ok(_) => {}, _ => {} }
+}
+
+// Accepted: storing into a generic container transfers the local obligation.
+// Dropping the receiving container is now diagnosed by Slice 3B. This closes
+// the ADR 0010 implementation limitation recorded for Slice 2C.
+fn genericContainerTransfers() -> Unit {
+    r = make()
+    h = Holder<Result<Int, String>> { outcome: r }
+}
+
+fn genericContainerDirect() -> Unit {
+    h = Holder<Result<Int, String>> { outcome: make() }
+}
+
+// NOTE: this fixture holds no ordinary checking error on purpose. The
+// obligation pass runs only when checking succeeded, so a checker diagnostic
+// here would suppress every T0012/T0013 below it.

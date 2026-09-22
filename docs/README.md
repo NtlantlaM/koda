@@ -30,6 +30,7 @@ A specification is authoritative over the implementation, never the other way ro
 | [Compiler slice 2A](implementation/slice-2a.md) | Generic data declarations, concrete type applications and substitution; no Result or generic functions |
 | [Compiler slice 2B](implementation/slice-2b.md) | Result values and matching: prelude Result, Ok/Err, contextual construction |
 | [Compiler slice 2C](implementation/slice-2c.md) | Result must-handle analysis: discard, outstanding obligations, transfer, overwrite |
+| [Compiler slice 3A](implementation/slice-3a.md) | Generic value construction: explicit and contextual type arguments, no inference |
 | [Roadmap](roadmap.md) | Stages, dependencies, and exit criteria |
 
 ## Reading status correctly
@@ -37,3 +38,22 @@ A specification is authoritative over the implementation, never the other way ro
 The status register is authoritative for feature classification. Specifications supply semantics; ADRs explain why a decision was made. An unresolved item explicitly listed in the open questions is not settled by an illustrative example. A conflict between documents is a design defect to resolve, not permission for an implementation to pick either interpretation.
 
 ACCEPTED means an accepted design direction, not shipped functionality or necessarily finalized spelling. Documents distinguish accepted semantic requirements from experimental syntax and unresolved details. Compiler behavior must eventually be checked against a versioned, frozen specification and conformance suite.
+
+- [Slice 3B: structural Result obligations](implementation/slice-3b.md) records
+  execution-path correctness, structural tracking and conditional payload completion.
+
+- [Slice 3C: core correctness repairs](implementation/slice-3c.md) records
+  operand evaluation order, extreme numeric literals and nested-block newlines.
+
+- [Slice 5: immutable lists and iteration](implementation/slice-5.md) records
+  `List<T>`, literals, `get`/`length`/`isEmpty`, `for` loops and the collective
+  responsibility rules R1/R2/R3.
+
+- [Slice 4A: explicit generic functions](implementation/slice-4a.md) records
+  generic declarations, explicit generic calls, call-site substitution and the
+  conservative responsibility rule for an abstract type parameter.
+
+- [Q05-A: declaration identity foundation](implementation/q05a-identity-foundation.md)
+  records the module-safe declaration identity that nominal typing, generic
+  owners and canonical `Result` now rest on. Behaviour-preserving; the
+  user-visible module system is not part of it.

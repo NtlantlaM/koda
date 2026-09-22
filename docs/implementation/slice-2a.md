@@ -101,3 +101,9 @@ Result values/matching remain Slice 2B and obligations remain Slice 2C. Generic
 functions, generic-call inference, construction spelling, defaults, constraints,
 variance, recursive data, complete namespaces, runtime generic strategy and
 multi-module/foreign integration are not implemented or newly decided here.
+
+---
+
+Generic **construction** — building a value of one of these types — lands in
+[slice 3A](slice-3a.md). Until then every user-defined generic type is
+well-typed and uninhabited.

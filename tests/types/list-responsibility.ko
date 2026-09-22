@@ -1,0 +1,104 @@
+// Slice 5 + ADR 0010: a list carries one collective responsibility for all of
+// its elements. R1 normal completion discharges, R2 a read renews without
+// discharging, R3 an early return discharges nothing.
+type Box<T> { value: T }
+
+fn make() -> Result<Int, String> { Ok(1) }
+fn makeAll() -> List<Result<Int, String>> { [make(), make()] }
+fn nothing() -> Unit { }
+
+// Rejected: the loop binding is ignored, so no element was accounted for.
+fn bindingIgnored() -> Unit {
+    for r in makeAll() {
+        nothing()
+    }
+}
+
+// Rejected: never iterated at all.
+fn neverIterated() -> Unit {
+    rs = makeAll()
+}
+
+// R2. Rejected twice: the value read renews its own responsibility, and the
+// list stays responsible for every element that was not read.
+fn readOneElement() -> Unit {
+    rs = makeAll()
+    first = rs.get(0)
+}
+
+// R2. length inspects no element, so it discharges nothing.
+fn lengthDoesNotDischarge() -> Int {
+    rs = makeAll()
+    rs.length()
+}
+
+// R2. isEmpty likewise.
+fn isEmptyDoesNotDischarge() -> Bool {
+    rs = makeAll()
+    rs.isEmpty()
+}
+
+// R3. Leaving early proves nothing about the elements not yet visited.
+fn earlyReturn() -> Int {
+    for r in makeAll() {
+        match r {
+            Ok(value) => { return value }
+            Err(_) => { }
+        }
+    }
+    0
+}
+
+// Renewal: the second read must be accounted for independently.
+fn secondIterationIgnored() -> Unit {
+    rs = makeAll()
+    for r in rs {
+        match r { Ok(_) => {}, Err(_) => {} }
+    }
+    for r in rs {
+        nothing()
+    }
+}
+
+// Structural paths reach through the collective element.
+fn nestedInContainer() -> Unit {
+    boxes: List<Box<Result<Int, String>>> = [Box<Result<Int, String>> { value: make() }]
+}
+
+// A nullable element keeps its own acknowledgment.
+fn nullableElement() -> Unit {
+    xs: List<Result<Int, String>?> = [make()]
+}
+
+// The provisional Model B asymmetry: an intrinsic may know what a user
+// generic function cannot express. This rejection is expected.
+fn countGeneric<T>(items: List<T>) -> Int {
+    items.length()
+}
+
+// Accepted, and here on purpose as the boundary of the rules:
+// R1 discharges when every element is handled at normal completion,
+// a non-bearing list is entirely silent, and length on one is fine.
+fn everyElementHandled() -> Unit {
+    for r in makeAll() {
+        match r { Ok(_) => {}, Err(_) => {} }
+    }
+}
+
+fn iteratedTwiceAndHandled() -> Unit {
+    rs = makeAll()
+    for r in rs {
+        match r { Ok(_) => {}, Err(_) => {} }
+    }
+    for r in rs {
+        match r { Ok(_) => {}, Err(_) => {} }
+    }
+}
+
+fn countStrings(items: List<String>) -> Int {
+    items.length()
+}
+
+fn transferredOnward() -> List<Result<Int, String>> {
+    makeAll()
+}

@@ -1,0 +1,43 @@
+// Slice 4A: a name followed by a balanced <...> is a generic call only before
+// `(`. Everything here is accepted; the point is that comparisons survive.
+type Box<T> { value: T }
+type Pair<A, B> { first: A, second: B }
+
+fn identity<T>(x: T) -> T { x }
+
+fn trailingCommaParameters<T,>(x: T) -> T { x }
+
+fn multilineParameters<
+    A,
+    B,
+>(a: A, b: B) -> Pair<A, B> { Pair<A, B> { first: a, second: b } }
+
+fn trailingCommaArguments() -> Int { identity<Int,>(1) }
+
+fn multilineArguments() -> Int {
+    identity<
+        Int
+    >(2)
+}
+
+fn comparisons(a: Int, b: Int, c: Int) -> Bool {
+    less = a < b
+    greater = b > c
+    less && greater
+}
+
+fn comparisonInControlHead(a: Int, b: Int) -> Int {
+    if a < b { 1 } else { 2 }
+}
+
+fn callInControlHead(a: Int) -> Int {
+    if identity<Int>(a) > 0 { 1 } else { 2 }
+}
+
+fn nestedArguments() -> Box<Box<Int>> {
+    identity<Box<Box<Int>>>(Box<Box<Int>> { value: Box<Int> { value: 1 } })
+}
+
+fn nullableArgument() -> Int? {
+    identity<Int?>(null)
+}

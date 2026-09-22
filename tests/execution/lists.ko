@@ -1,0 +1,114 @@
+// Slice 5: every accepted list and iteration shape, run for real.
+import { print } from "koda:io"
+
+type User { name: String }
+enum Tag { Red, Blue }
+
+fn describeTag(t: Tag) -> String {
+    match t {
+        Tag.Red => "red"
+        Tag.Blue => "blue"
+    }
+}
+
+fn total(numbers: List<Int>) -> Int {
+    numbers.length()
+}
+
+fn firstName(users: List<User>) -> String {
+    found = users.get(0)
+    match found {
+        null => "nobody"
+        present => present.name
+    }
+}
+
+fn emptyByContext() -> List<Int> {
+    []
+}
+
+fn floats() -> List<Float> {
+    [1, 2.5]
+}
+
+fn nullableElements() -> List<Int?> {
+    [1, null]
+}
+
+fn firstMatching(numbers: List<Int>, wanted: Int) -> Int {
+    for n in numbers {
+        if n == wanted {
+            return n
+        }
+    }
+    0
+}
+
+export fn main() -> Unit {
+    names = ["Thandi", "Kagiso", "Lerato"]
+    for name in names {
+        print(name)
+    }
+
+    print("{names.length()}")
+    print(yesNo(names.isEmpty()))
+    print(yesNo(emptyByContext().isEmpty()))
+    print("{total([10, 20, 30])}")
+
+    nested = [[1, 2], [3, 4]]
+    for row in nested {
+        for n in row {
+            print("{n}")
+        }
+    }
+
+    users = [
+        User { name: "Thandi" },
+        User { name: "Kagiso" },
+    ]
+    print(firstName(users))
+    print(firstName([]))
+
+    for tag in [Tag.Red, Tag.Blue] {
+        print(describeTag(tag))
+    }
+
+    for n in emptyByContext() {
+        print("never runs {n}")
+    }
+
+    print("{floats().length()}")
+    for f in floats() {
+        print("{f}")
+    }
+
+    for maybe in nullableElements() {
+        match maybe {
+            null => print("absent")
+            present => print("{present}")
+        }
+    }
+
+    inRange = names.get(1)
+    match inRange {
+        null => print("none")
+        present => print(present)
+    }
+    outOfRange = names.get(99)
+    match outOfRange {
+        null => print("none")
+        present => print(present)
+    }
+    negative = names.get(0 - 1)
+    match negative {
+        null => print("none")
+        present => print(present)
+    }
+
+    print("{firstMatching([5, 7, 9], 7)}")
+    print("{firstMatching([5, 7, 9], 42)}")
+}
+
+fn yesNo(flag: Bool) -> String {
+    if flag { "empty" } else { "not empty" }
+}

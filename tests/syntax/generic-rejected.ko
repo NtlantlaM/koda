@@ -1,16 +1,16 @@
-// Invalid parameter syntax and excluded generic function/call/construction forms.
+// Invalid type parameter/argument syntax. Generic functions and calls are now
+// implemented (Slice 4A), so only malformed and deferred forms remain here.
 type Empty<> { value: Int }
 type Bounded<T: Int> { value: T }
 type Defaulted<T = Int> { value: T }
 type NoComma<A B> { value: A }
 type DoubleNullable<T> { value: T?? }
-fn generic<T>(value: T) -> T { value }
-fn call() -> Unit { parse<Int>("42") }
-fn record() -> Unit { value = Box<Int> { value: 1 } }
-fn enumeration() -> Unit { value = Choice<Int>.Value(1) }
-fn multilineCall() -> Unit {
-    parse<
-        Int
-    >("42")
-}
+fn emptyParameters<>(value: Int) -> Int { value }
+fn boundedParameter<T: Int>(value: T) -> T { value }
+fn defaultedParameter<T = Int>(value: T) -> T { value }
+fn noCommaParameters<A B>(a: A) -> A { a }
+fn unterminatedApplication(value: DoubleNullable<Int) -> Unit {}
 fn nullableApplication(value: DoubleNullable<Int>??) -> Unit {}
+fn emptyCallArguments() -> Unit { identity<>(1) }
+fn noCommaCallArguments() -> Unit { identity<Int String>(1) }
+fn unterminatedCall() -> Unit { identity<Int>(

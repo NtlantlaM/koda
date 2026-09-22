@@ -1,0 +1,46 @@
+// Q05-A: Result must still be recognised by its canonical declaration identity
+// after the move from a bare numeric id to { module, local }. Every rejection
+// here predates Q05-A; none of them may change.
+type Box<T> { value: T }
+type Holder { outcome: Result<Int, String> }
+enum Carrier { Has(outcome: Result<Int, String>), Empty }
+
+fn make() -> Result<Int, String> { Ok(1) }
+fn nestedMake() -> Result<Result<Int, String>, String> { Ok(Ok(1)) }
+fn maybe() -> Result<Int, String>? { Ok(1) }
+
+// Outstanding at scope exit.
+fn outstanding() -> Unit { r = make() }
+
+// Overwritten before being handled.
+fn overwritten() -> Unit {
+    mut r = make()
+    r = make()
+    match r { Ok(_) => {}, Err(_) => {} }
+}
+
+// An Ok payload that is itself a Result carries its own responsibility.
+fn nestedInner() -> Unit {
+    match nestedMake() { Ok(inner) => {}, Err(_) => {} }
+}
+
+// A nullable Result still needs its two-step discharge.
+fn nullableUnhandled() -> Unit { r = maybe() }
+
+// Result inside a generic container, tracked structurally (Slice 3B).
+fn insideGenericBox() -> Unit { b = Box<Result<Int, String>> { value: make() } }
+
+// Result inside a record field.
+fn insideRecordField() -> Unit { h = Holder { outcome: make() } }
+
+// Result inside an enum payload.
+fn insideEnumPayload() -> Unit { c = Carrier.Has(make()) }
+
+// A Result parameter begins outstanding.
+fn ignoredParameter(r: Result<Int, String>) -> Unit { }
+
+// A wildcard never discharges, because Err is not made visible.
+fn wildcardDoesNotDischarge() -> Unit {
+    r = make()
+    match r { Ok(_) => {}, _ => {} }
+}
