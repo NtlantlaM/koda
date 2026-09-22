@@ -45,6 +45,10 @@ ACCEPTED means an accepted design direction, not shipped functionality or necess
 - [Slice 3C: core correctness repairs](implementation/slice-3c.md) records
   operand evaluation order, extreme numeric literals and nested-block newlines.
 
+- [Slice 6C: recursive data](implementation/slice-6c.md) records the two
+  conditions a recursive declaration must meet, the declaration-level `bears`
+  fixed point, and where obligation shapes stop.
+
 - [Slice 6B: string inspection](implementation/slice-6b.md) records scalar-value
   `length`, `get`, `startsWith`, `endsWith` and `contains`, and why native
   matching is scalar-correct.

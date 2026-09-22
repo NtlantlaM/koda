@@ -1,0 +1,128 @@
+// Slice 6C: a declaration may contain itself when the cycle can stop and
+// nothing on it carries responsibility. Traversal needs no new feature -
+// ordinary function recursion already walks it.
+import { print } from "koda:io"
+
+type Control {
+    name: String
+    children: List<Control>
+}
+
+// A nullable makes this cycle stoppable.
+type Node {
+    value: Int
+    next: Node?
+}
+
+// Mutual recursion, stoppable through B's nullable.
+type Branch { label: String, twig: Twig }
+type Twig { back: Branch? }
+
+enum Shape {
+    Dot
+    Group(parts: List<Shape>)
+}
+
+// A payload-less variant is the base case, so a variant may hold the type
+// directly without a list or a nullable.
+enum Chain {
+    End
+    Link(next: Chain)
+}
+
+fn countControls(control: Control) -> Int {
+    mut total = 1
+    for child in control.children {
+        total = total + countControls(child)
+    }
+    total
+}
+
+fn depth(control: Control) -> Int {
+    mut deepest = 0
+    for child in control.children {
+        found = depth(child)
+        if found > deepest { deepest = found }
+    }
+    deepest + 1
+}
+
+fn outline(control: Control, indent: String) -> List<String> {
+    mut lines: List<String> = []
+    lines = lines.append("{indent}{control.name}")
+    for child in control.children {
+        for line in outline(child, "{indent}  ") {
+            lines = lines.append(line)
+        }
+    }
+    lines
+}
+
+fn chainLength(node: Node?) -> Int {
+    match node {
+        null => 0
+        present => 1 + chainLength(present.next)
+    }
+}
+
+fn dots(shape: Shape) -> Int {
+    match shape {
+        Shape.Dot => 1
+        Shape.Group(parts) => {
+            mut total = 0
+            for part in parts { total = total + dots(part) }
+            total
+        }
+    }
+}
+
+fn links(chain: Chain) -> Int {
+    match chain {
+        Chain.End => 0
+        Chain.Link(next) => 1 + links(next)
+    }
+}
+
+fn twigDepth(branch: Branch) -> Int {
+    match branch.twig.back {
+        null => 1
+        present => 1 + twigDepth(present)
+    }
+}
+
+export fn main() -> Unit {
+    tree = Control {
+        name: "Root"
+        children: [
+            Control { name: "A", children: [
+                Control { name: "A1", children: [] },
+                Control { name: "A2", children: [
+                    Control { name: "A2a", children: [] },
+                ] },
+            ] },
+            Control { name: "B", children: [] },
+        ]
+    }
+
+    print("{countControls(tree)} controls, depth {depth(tree)}")
+    for line in outline(tree, "") {
+        print(line)
+    }
+
+    // A leaf: the cycle stopped immediately.
+    leaf = Control { name: "Leaf", children: [] }
+    print("{countControls(leaf)} control, depth {depth(leaf)}")
+
+    chain = Node { value: 1, next: Node { value: 2, next: Node { value: 3, next: null } } }
+    print("chain {chainLength(chain)}")
+    print("chain {chainLength(null)}")
+
+    print("dots {dots(Shape.Group([Shape.Dot, Shape.Group([Shape.Dot, Shape.Dot])]))}")
+    print("dots {dots(Shape.Dot)}")
+
+    print("links {links(Chain.Link(Chain.Link(Chain.End)))}")
+    print("links {links(Chain.End)}")
+
+    nested = Branch { label: "outer", twig: Twig { back: Branch { label: "inner", twig: Twig { back: null } } } }
+    print("branches {twigDepth(nested)}")
+}

@@ -210,17 +210,103 @@ Nullable normalization applies to substituted nullable layers, not generic argum
 identity. `Box<Int>?` and `Box<Int?>` also remain distinct. Written `T??`
 is still rejected.
 
-Finite nesting such as `Box<Box<Int>>` is valid. Follow stored field/payload
-type dependencies to detect declaration cycles; revisiting the same declaration
-on that dependency path is invalid regardless of its supplied arguments. This
-rejects direct, mutual and transformed recursion, without treating repeated
-names in finite use-site nesting as recursion.
+Finite nesting such as `Box<Box<Int>>` is valid. Declaration cycles are found by
+following stored field and payload type dependencies, and repeated names in
+finite use-site nesting are not recursion. Which cycles are permitted is
+settled under [recursive data](#recursive-data-slice-6c).
 
 Slice 2A permitted generic data descriptions in annotations, nongeneric function
 signatures, fields, and payloads, and added no way to build a value of such a
 type. [Slice 3A](#constructing-a-generic-value-slice-3a) adds construction. No
 constraints or runtime generic representation strategy is selected; Q08 remains
 unresolved.
+
+## Recursive data (Slice 6C)
+
+Status: **ACCEPTED**, explicit human decision on 2026-09-22.
+[ADR 0007](../decisions/0007-q11-type-boundaries.md) owns the admission rule and
+[ADR 0010](../decisions/0010-q04-result-obligations.md) the reason for its
+boundary.
+
+A declaration may refer to itself, directly or through other declarations, when
+**both** of the following hold.
+
+### It must be inhabitable
+
+A cycle must pass through at least one member that can stop: a nullable, or a
+list, since `null` and `[]` are base cases.
+
+```ko
+type Control { name: String, children: List<Control> }   // accepted
+type Node    { value: Int, next: Node? }                 // accepted
+type Node    { value: Int, next: Node }                  // rejected: no finite value exists
+```
+
+The last one is not deferred — it is uninhabitable. Building a `Node` would
+need a `Node` first, with nothing to stop the regress.
+
+### No declaration on the cycle may carry responsibility
+
+```ko
+type Control { name: String, children: List<Control> }        // accepted
+type Job     { result: Result<Int, String>, children: List<Job> }  // rejected
+```
+
+A recursive structure holds unboundedly many values, so a recursive structure
+whose elements can each carry a `Result` holds unboundedly many
+responsibilities. Koda tracks responsibility structurally and statically, and
+cannot enumerate an unbounded structure, so such a declaration is rejected
+rather than tracked approximately. `Control` carries none anywhere, so nothing
+is lost by admitting it.
+
+The rule is about the whole cycle, not one edge: a declaration that reaches a
+`Result` through *any* member is bearing, so `Control` holding a
+responsibility-bearing field would be rejected even though the recursive field
+itself carries nothing.
+
+### Generic recursive declarations
+
+```ko
+type Tree<T> { value: T, children: List<Tree<T>> }       // rejected
+```
+
+An unconstrained type parameter is assumed to carry responsibility
+([Slice 4A](#generic-functions-slice-4a)), so every generic recursive
+declaration is bearing. A declaration is checked once and must hold for every
+instantiation, and `Tree<Result<Int, String>>` is a legitimate one. This
+restriction follows from that conservative rule and moves with it.
+
+### Enums recurse too
+
+```ko
+enum Tree {
+    Leaf(value: Int)
+    Branch(children: List<Tree>)
+}
+```
+
+The same two conditions apply. **A variant that carries nothing is a base
+case**, so a variant may hold the type directly:
+
+```ko
+enum Chain { End, Link(next: Chain) }    // accepted: End stops it
+enum Endless { A(next: Endless), B(other: Endless) }   // rejected: nothing stops it
+```
+
+### Traversal
+
+Recursive data needs no new traversal feature. Ordinary function recursion
+already walks it:
+
+```ko
+fn countControls(control: Control) -> Int {
+    mut total = 1
+    for child in control.children {
+        total = total + countControls(child)
+    }
+    total
+}
+```
 
 ## Constructing a generic value (Slice 3A)
 

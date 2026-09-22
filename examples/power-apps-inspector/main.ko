@@ -16,6 +16,9 @@
 //     Gallery   -> gal_
 //     TextInput -> txt_
 //
+// Slice 6C added recursive data, so a Control can now contain Controls and the
+// inspector walks the real nested tree with a recursive function.
+//
 // Still out of reach: slicing and substrings, splitting, case conversion and
 // ordering, so the tool cannot yet suggest a corrected name or compare names
 // case-insensitively.
@@ -26,6 +29,7 @@ import { print } from "koda:io"
 type Control {
     name: String
     kind: String
+    children: List<Control>
 }
 
 type Issue {
@@ -93,6 +97,19 @@ fn followsConvention(control: Control) -> Bool {
     if prefix == "" { false } else { control.name.startsWith(prefix) }
 }
 
+// Every control in the tree, depth first. Recursive data makes this the
+// natural shape; before Slice 6C the model could not nest at all.
+fn flatten(controls: List<Control>) -> List<Control> {
+    mut all: List<Control> = []
+    for control in controls {
+        all = all.append(control)
+        for descendant in flatten(control.children) {
+            all = all.append(descendant)
+        }
+    }
+    all
+}
+
 // Duplicate names, found by comparing every control against every other.
 // Koda has no index-based loop, so a pair can only be compared symmetrically:
 // this reports the clash once from each side. That is a real limitation, left
@@ -123,13 +140,25 @@ fn collect(into: List<Issue>, found: List<Issue>) -> List<Issue> {
     all
 }
 
+// Inspect one control and everything beneath it.
+fn inspectControl(control: Control, everything: List<Control>) -> List<Issue> {
+    mut issues: List<Issue> = []
+    issues = collect(issues, checkNamePresent(control))
+    issues = collect(issues, checkKindRecognised(control))
+    issues = collect(issues, checkNaming(control))
+    issues = collect(issues, checkNameUnique(everything, control))
+
+    for child in control.children {
+        issues = collect(issues, inspectControl(child, everything))
+    }
+    issues
+}
+
 fn inspect(controls: List<Control>) -> List<Issue> {
+    everything = flatten(controls)
     mut issues: List<Issue> = []
     for control in controls {
-        issues = collect(issues, checkNamePresent(control))
-        issues = collect(issues, checkKindRecognised(control))
-        issues = collect(issues, checkNaming(control))
-        issues = collect(issues, checkNameUnique(controls, control))
+        issues = collect(issues, inspectControl(control, everything))
     }
     issues
 }
@@ -147,34 +176,54 @@ fn verdict(control: Control) -> String {
     }
 }
 
-fn report(controls: List<Control>) -> Unit {
+fn report(controls: List<Control>, indent: String) -> Unit {
     for control in controls {
-        print(control.name)
-        print(verdict(control))
+        print("{indent}{control.name}")
+        print("{indent}{verdict(control)}")
         print("")
+        report(control.children, "{indent}  ")
     }
 }
 
 export fn main() -> Unit {
+    // A real screen nests: a container holds the controls inside it.
     controls = [
-        Control { name: "Button1", kind: "Button" },
-        Control { name: "btn_Submit", kind: "Button" },
-        Control { name: "Gallery1", kind: "Gallery" },
-        Control { name: "gal_Orders", kind: "Gallery" },
-        Control { name: "TextInput1", kind: "TextInput" },
-        Control { name: "txt_Search", kind: "TextInput" },
+        Control {
+            name: "Gallery1"
+            kind: "Gallery"
+            children: [
+                Control { name: "Button1", kind: "Button", children: [] },
+                Control { name: "lbl_Title", kind: "Label", children: [] },
+            ]
+        },
+        Control {
+            name: "gal_Orders"
+            kind: "Gallery"
+            children: [
+                Control {
+                    name: "cnt_Row"
+                    kind: "Container"
+                    children: [
+                        Control { name: "btn_Submit", kind: "Button", children: [] },
+                        Control { name: "TextInput1", kind: "TextInput", children: [] },
+                    ]
+                },
+            ]
+        },
+        Control { name: "txt_Search", kind: "TextInput", children: [] },
     ]
 
     print("Power Apps Inspector")
     print("")
-    print("Checking {controls.length()} controls...")
+    all = flatten(controls)
+    print("Checking {all.length()} controls...")
     print("")
 
-    report(controls)
+    report(controls, "")
 
     issues = inspect(controls)
 
-    print("{controls.length()} controls checked")
+    print("{all.length()} controls checked")
     print("{issues.length()} issues found")
 
     for issue in issues {
@@ -186,15 +235,21 @@ export fn main() -> Unit {
     print("")
     print("--- self-check on deliberately broken input ---")
 
+    // A duplicate hiding at a different depth is now findable.
     broken = [
-        Control { name: "", kind: "Button" },
-        Control { name: "Widget1", kind: "Accordion" },
-        Control { name: "Shared", kind: "Label" },
-        Control { name: "Shared", kind: "Label" },
+        Control { name: "", kind: "Button", children: [] },
+        Control { name: "Widget1", kind: "Accordion", children: [] },
+        Control {
+            name: "Shared"
+            kind: "Label"
+            children: [
+                Control { name: "Shared", kind: "Label", children: [] },
+            ]
+        },
     ]
 
     brokenIssues = inspect(broken)
-    print("{broken.length()} controls checked")
+    print("{flatten(broken).length()} controls checked")
     print("{brokenIssues.length()} issues found")
 
     for issue in brokenIssues {

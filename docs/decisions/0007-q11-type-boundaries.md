@@ -347,3 +347,53 @@ It selects no Q08 representation and no foreign-boundary contract.
 
 See [type-system rules](../spec/type-system.md#inspecting-a-string-slice-6b)
 and the [implementation boundary](../implementation/slice-6b.md).
+
+## 2026-09-22 — accepted recursive data (Slice 6C)
+
+Approver: repository owner/user, by explicit Slice 6C acceptance and
+implementation authorization. This is a clarification of Q11 and **partially
+lifts this ADR's own deferral of recursive user-defined data types**. It
+selects no Q08 representation, no ownership model and no effect system.
+
+A declaration may refer to itself, directly or through other declarations, when
+both conditions hold.
+
+- **Inhabitable.** The cycle passes through at least one member that can stop:
+  a nullable, a list, or a payload-less enum variant. `null` and `[]` are the base cases. A cycle with no
+  such member, such as `type Node { next: Node }`, is **uninhabitable** - no
+  finite value exists - and is rejected on that ground, with a diagnostic
+  distinct from the responsibility one.
+- **Non-bearing.** No declaration on the cycle may carry responsibility. A
+  declaration bears when any stored member reaches a `Result` application, an
+  unconstrained type parameter, or another bearing declaration; this is a least
+  fixed point over the declarations, so a declaration whose only self-reference
+  is its own cycle does not bear.
+
+The condition is about the whole cycle, not one edge: a declaration reaching a
+`Result` through any member is bearing, and is rejected even when the recursive
+member itself carries nothing.
+
+Consequences:
+
+- `type Control { name: String, children: List<Control> }` is accepted.
+- `type Job { result: Result<Int, String>, children: List<Job> }` is rejected.
+- **Every generic recursive declaration is rejected**, because an unconstrained
+  type parameter is assumed to bear under the Slice 4A rule and a declaration
+  must hold for every instantiation. That restriction is a consequence of that
+  conservative rule and moves with it; it is not an independent decision.
+- Recursive enums are included, under the same two conditions. A variant that
+  carries nothing is a base case, so `enum Chain { End, Link(next: Chain) }` is
+  accepted while an enum whose every variant carries the type back is not.
+- Mutual recursion is included, under the same two conditions.
+- A cycle reached only through a type argument of a declaration that stores
+  nothing, such as `Phantom<Control>` inside `Control`, remains rejected. That
+  is the pre-existing conservatism that argument changes cannot hide a cycle,
+  and it is unchanged here.
+
+Recursive data needs no new traversal feature: ordinary function recursion,
+accepted by this ADR, already walks it.
+
+See [type-system rules](../spec/type-system.md#recursive-data-slice-6c) and the
+[implementation boundary](../implementation/slice-6c.md). The reason the
+non-bearing condition exists is recorded in
+[ADR 0010](0010-q04-result-obligations.md).

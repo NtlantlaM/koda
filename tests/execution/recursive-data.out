@@ -1,0 +1,15 @@
+6 controls, depth 4
+Root
+  A
+    A1
+    A2
+      A2a
+  B
+1 control, depth 1
+chain 3
+chain 0
+dots 3
+dots 1
+links 2
+links 0
+branches 2

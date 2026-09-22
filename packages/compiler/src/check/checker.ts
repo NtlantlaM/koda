@@ -489,12 +489,69 @@ export class Checker {
    * ADR 0007 defers recursive user-defined data types, so a cycle through
    * fields or payloads is rejected rather than quietly accepted.
    */
+  /**
+   * The declarations that can carry responsibility (Slice 6C).
+   *
+   * A declaration bears when any stored member reaches a `Result`, an
+   * unconstrained type parameter (which is assumed to bear under Slice 4A), or
+   * another bearing declaration. This is a **least** fixed point: iteration
+   * starts at "nothing bears" and runs to stability, which is what makes a
+   * declaration whose only self-reference is its own cycle resolve to false
+   * rather than looping.
+   *
+   * ADR 0010 uses this to decide which recursive cycles can be admitted: a
+   * recursive structure holds unboundedly many values, so one whose elements
+   * can each carry a Result holds unboundedly many responsibilities, and that
+   * cannot be tracked structurally.
+   */
+  private bearingDeclarations(): Set<string> {
+    const bearing = new Set<string>();
+
+    const reaches = (type: KType): boolean => {
+      if (type.kind === "Nullable") return reaches(type.inner);
+      if (type.kind === "TypeParameter") return true;
+      if (type.kind === "Record" || type.kind === "Enum") {
+        if (this.isResult(type)) return true;
+        if (bearing.has(declarationKey(type.declaration.id))) return true;
+        return type.arguments.some(reaches);
+      }
+      return false;
+    };
+
+    const members = (key: string): KType[] => {
+      const record = [...this.records.values()].find((item) => declarationKey(item.id) === key);
+      if (record) return record.fields.map((field) => field.type);
+      const enumeration = [...this.enums.values()].find((item) => declarationKey(item.id) === key);
+      if (!enumeration) return [];
+      return enumeration.variants.flatMap((variant) => (variant.payload ?? []).map((field) => field.type));
+    };
+
+    const keys = [
+      ...[...this.records.values()].map((item) => declarationKey(item.id)),
+      ...[...this.enums.values()].map((item) => declarationKey(item.id)),
+    ];
+
+    // Iterate to stability. Each round can only add, and there are finitely
+    // many declarations, so this terminates.
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const key of keys) {
+        if (bearing.has(key)) continue;
+        if (members(key).some(reaches)) {
+          bearing.add(key);
+          changed = true;
+        }
+      }
+    }
+    return bearing;
+  }
+
   private rejectRecursiveData(): void {
     interface Node {
       readonly id: DeclarationId;
       readonly name: string;
       readonly nameSpan: Span;
-      readonly edges: { readonly to: string; readonly via: string }[];
+      readonly edges: { readonly to: string; readonly via: string; readonly breakable: boolean }[];
     }
     // Q05-A: keyed by `declarationKey`, not a bare number, so two modules'
     // local id 1 can never share a node.
@@ -502,10 +559,18 @@ export class Checker {
 
     // Walk stored type expressions, including nullable wrappers and arguments.
     // Edges are declaration identities: changing arguments cannot hide a cycle.
-    const targets = (type: KType): string[] => {
-      if (type.kind === "Nullable") return targets(type.inner);
+    //
+    // Slice 6C: an edge is `breakable` when reaching it passes through a
+    // nullable or a list element, because `null` and `[]` are base cases. A
+    // cycle with no breakable edge describes a value that cannot be built.
+    const targets = (type: KType, breakable: boolean): { to: string; breakable: boolean }[] => {
+      if (type.kind === "Nullable") return targets(type.inner, true);
       if (type.kind === "Record" || type.kind === "Enum") {
-        return [declarationKey(type.declaration.id), ...type.arguments.flatMap(targets)];
+        const through = this.isList(type) || breakable;
+        return [
+          { to: declarationKey(type.declaration.id), breakable },
+          ...type.arguments.flatMap((argument) => targets(argument, through)),
+        ];
       }
       return [];
     };
@@ -513,23 +578,31 @@ export class Checker {
     for (const record of this.records.values()) {
       const edges: Node["edges"] = [];
       for (const field of record.fields) {
-        for (const to of targets(field.type)) edges.push({ to, via: field.name });
+        for (const edge of targets(field.type, false)) edges.push({ ...edge, via: field.name });
       }
       nodes.set(declarationKey(record.id), { id: record.id, name: record.name, nameSpan: record.nameSpan, edges });
     }
     for (const enumeration of this.enums.values()) {
       const edges: Node["edges"] = [];
+      // A variant that carries nothing is a base case, so a cycle through this
+      // enum's payloads can stop: `enum Tree { Leaf, Node(child: Tree) }` is
+      // built as `Tree.Leaf`. Without one, every value would need another.
+      const hasBaseVariant = enumeration.variants.some((variant) => (variant.payload ?? []).length === 0);
       for (const variant of enumeration.variants) {
         for (const component of variant.payload ?? []) {
-          for (const to of targets(component.type)) edges.push({ to, via: `${variant.name}.${component.name}` });
+          for (const edge of targets(component.type, hasBaseVariant)) {
+            edges.push({ ...edge, via: `${variant.name}.${component.name}` });
+          }
         }
       }
       nodes.set(declarationKey(enumeration.id), { id: enumeration.id, name: enumeration.name, nameSpan: enumeration.nameSpan, edges });
     }
 
+    const bearing = this.bearingDeclarations();
+
     const state = new Map<string, "visiting" | "done">();
     const reported = new Set<string>();
-    const stack: { id: string; via: string }[] = [];
+    const stack: { id: string; via: string; breakable: boolean }[] = [];
 
     const visit = (id: string): void => {
       const node = nodes.get(id);
@@ -538,27 +611,48 @@ export class Checker {
       if (state.get(id) === "visiting") {
         const start = stack.findIndex((frame) => frame.id === id);
         const cycle = stack.slice(start < 0 ? 0 : start);
+        // Slice 6C: a cycle is admitted when nothing on it carries
+        // responsibility and it can actually be built. Otherwise say which.
+        const carries = cycle.some((frame) => bearing.has(frame.id)) || bearing.has(id);
+        const canStop = cycle.some((frame) => frame.breakable);
+        if (!carries && canStop) return;
+
         if (cycle.every((frame) => !reported.has(frame.id))) {
           for (const frame of cycle) reported.add(frame.id);
           const names = [...cycle.map((frame) => nodes.get(frame.id)?.name ?? "?"), node.name];
           const hops = cycle.map((frame) => frame.via);
-          this.diagnostics.add({
-            code: Codes.Unsupported,
-            message: `'${node.name}' contains itself`,
-            span: node.nameSpan,
-            label: "this type is defined in terms of itself",
-            notes: [
-              `the chain is ${names.join(" -> ")}, through ${hops.join(", ")}`,
-              "recursive data types are an accepted deferral (ADR 0007) and are not available yet",
-            ],
-          });
+          const chain = `the chain is ${names.join(" -> ")}, through ${hops.join(", ")}`;
+          this.diagnostics.add(carries
+            ? {
+              code: Codes.Unsupported,
+              message: `'${node.name}' can hold outcomes at any depth`,
+              span: node.nameSpan,
+              label: "this type contains itself, and each level can carry a Result",
+              notes: [
+                chain,
+                "Koda tracks responsibility structurally, and cannot account for unboundedly many outcomes",
+                "an unconstrained type parameter counts, because it might be a Result",
+                "a recursive type is allowed when nothing on the cycle can carry one",
+              ],
+            }
+            : {
+              code: Codes.Unsupported,
+              message: `'${node.name}' cannot be built`,
+              span: node.nameSpan,
+              label: `every path back to '${node.name}' stores one directly`,
+              notes: [
+                chain,
+                "building one would need another first, with nothing to stop it",
+                "make a step optional with '?', or hold the children in a List",
+              ],
+            });
         }
         return;
       }
 
       state.set(id, "visiting");
       for (const edge of node.edges) {
-        stack.push({ id, via: edge.via });
+        stack.push({ id, via: edge.via, breakable: edge.breakable });
         visit(edge.to);
         stack.pop();
       }

@@ -17,6 +17,20 @@ export const ELEMENT_KEY = "e";
 /** Caches instantiated shapes, not declaration-only shapes or runtime values. */
 export class Shapes {
   private readonly cache = new Map<string, Shape>();
+  /**
+   * Declarations currently being expanded (Slice 6C).
+   *
+   * The cache is written only after a shape's children are built, so a
+   * recursive declaration would re-enter with a cache miss and recurse
+   * forever. Making the shape graph cyclic would not help either: `fresh`,
+   * `copy` and `mark` materialise children eagerly. So expansion stops at the
+   * point of recursion instead.
+   *
+   * Stopping is sound because of the checker's rule, not in spite of it: a
+   * cycle is only admitted when no declaration on it bears responsibility, so
+   * there is provably nothing beyond the stop to lose.
+   */
+  private readonly expanding = new Set<string>();
   constructor(private readonly resultId: DeclarationId, private readonly listId: DeclarationId | null = null) {}
   private key(type: KType): string {
     if (type.kind === "Nullable") return this.key(type.inner) + "?";
@@ -27,6 +41,11 @@ export class Shapes {
   of(type: KType): Shape {
     const key = this.key(type), cached = this.cache.get(key);
     if (cached) return cached;
+    if (this.expanding.has(key)) {
+      // Slice 6C: the recursion stops here, opaque and non-bearing.
+      return { type, kind: "empty", acknowledgment: false, children: new Map(), alternatives: [], bears: false };
+    }
+    this.expanding.add(key);
     const children = new Map<string, { label: string; shape: Shape }>();
     let kind: Shape["kind"] = "empty", acknowledgment = false;
     let alternatives: string[] = [];
@@ -65,6 +84,7 @@ export class Shapes {
       });
     }
     const shape: Shape = { type, kind, acknowledgment, children, alternatives, bears: acknowledgment || [...children.values()].some(c => c.shape.bears) };
+    this.expanding.delete(key);
     this.cache.set(key, shape);
     return shape;
   }

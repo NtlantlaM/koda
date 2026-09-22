@@ -36,7 +36,9 @@ always written. [Slice 5](docs/implementation/slice-5.md) adds an immutable
 program can build lists rather than only write them, and
 [slice 6B](docs/implementation/slice-6b.md) adds scalar-value string inspection:
 `length`, `get`, `startsWith`, `endsWith` and `contains`.
-Type-argument inference, string slicing, recursive data,
+[Slice 6C](docs/implementation/slice-6c.md) admits recursive data that can stop
+and carries no responsibility, so a tree of records is finally expressible.
+Type-argument inference, string slicing, responsibility-bearing recursive data,
 multi-module programs and npm
 interop are **not** implemented. There
 is no formatter, test runner or package manager. Some `examples/` programs use

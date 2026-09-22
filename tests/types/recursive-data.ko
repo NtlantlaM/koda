@@ -1,33 +1,68 @@
-// ADR 0007 defers recursive user-defined data types, so a type that contains
-// itself - directly, through another type, or through an enum payload - is
-// rejected rather than quietly accepted.
-type DirectlyRecursive {
-    label: String
-    next: DirectlyRecursive
+// Slice 6C: a recursive cycle is admitted only when it can stop and nothing on
+// it carries responsibility. One rejection per declaration.
+type Task { outcome: Result<Int, String> }
+
+// Bearing directly: each level can hold a Result.
+type Job {
+    result: Result<Int, String>
+    children: List<Job>
 }
 
-type Left {
-    right: Right
+// Bearing indirectly: the recursive member carries nothing, but Job2 does.
+type Job2 {
+    task: Task
+    children: List<Job2>
 }
 
-type Right {
-    left: Left
+// Bearing through a nullable Result.
+type Job3 {
+    maybe: Result<Int, String>?
+    children: List<Job3>
 }
 
-enum Tree {
-    Leaf
-    Node(child: Tree)
+// Bearing through an enum payload.
+enum Work {
+    Idle
+    Busy(outcome: Result<Int, String>, rest: List<Work>)
 }
 
-// A type that merely mentions another, without a cycle, is fine.
-type Inner {
+// Uninhabitable: every path back stores one directly.
+type Straight {
     value: Int
+    next: Straight
 }
 
-type Outer {
-    inner: Inner
+// Uninhabitable through mutual recursion.
+type Pair1 { other: Pair2 }
+type Pair2 { back: Pair1 }
+
+// Generic recursive declarations stay rejected: an unconstrained type
+// parameter might be a Result.
+type Tree<T> {
+    value: T
+    children: List<Tree<T>>
 }
 
-export fn main() -> Unit {
-    ignored = Outer { inner: Inner { value: 1 } }
+enum Bag<T> {
+    Empty
+    Full(value: T, rest: List<Bag<T>>)
+}
+
+// Uninhabitable enum: every variant carries the type itself, so there is no
+// base case to stop at.
+enum Endless {
+    A(next: Endless)
+    B(other: Endless)
+}
+
+// Accepted, and here on purpose as the boundary: mentioning another type
+// without forming a cycle has never been recursion.
+type Inner { value: Int }
+type Outer { inner: Inner }
+
+// Accepted: a payload-less variant is the base case that makes a directly
+// recursive enum buildable.
+enum Chain2 {
+    End
+    Link(next: Chain2)
 }

@@ -367,3 +367,83 @@ describe("string inspection", () => {
     assert.equal(result.ok, true, JSON.stringify(result.diagnostics));
   });
 });
+
+// Slice 6C: recursive data is admitted when the cycle can stop and nothing on
+// it bears. Shapes stop at the point of recursion.
+describe("recursive data", () => {
+  function result(source: string) {
+    return check({ readFile: () => source }, { path: "recursive.ko" });
+  }
+
+  const control = "type Control { name: String, children: List<Control> }\n";
+
+  test("a non-bearing, stoppable cycle is admitted", () => {
+    for (const source of [
+      control,
+      "type Node { value: Int, next: Node? }",
+      "enum Tree { Leaf(value: Int), Branch(children: List<Tree>) }",
+      "type A { b: B }\ntype B { a: A? }",
+    ]) {
+      assert.equal(result(source).ok, true, source);
+    }
+  });
+
+  test("a bearing cycle is rejected, directly or indirectly", () => {
+    for (const source of [
+      "type Job { result: Result<Int,String>, children: List<Job> }",
+      "type Task { outcome: Result<Int,String> }\ntype Job { task: Task, children: List<Job> }",
+      "enum Work { Idle, Busy(outcome: Result<Int,String>, rest: List<Work>) }",
+    ]) {
+      const actual = result(source);
+      assert.equal(actual.ok, false, source);
+      assert.match(actual.diagnostics[0]!.message, /can hold outcomes at any depth/, source);
+    }
+  });
+
+  test("an uninhabitable cycle is rejected as such, not as bearing", () => {
+    for (const source of [
+      "type Node { value: Int, next: Node }",
+      "type A { b: B }\ntype B { a: A }",
+    ]) {
+      const actual = result(source);
+      assert.equal(actual.ok, false, source);
+      assert.match(actual.diagnostics[0]!.message, /cannot be built/, source);
+    }
+  });
+
+  test("generic recursive declarations stay rejected under Model B", () => {
+    const actual = result("type Tree<T> { value: T, children: List<Tree<T>> }");
+    assert.equal(actual.ok, false);
+    assert.match(actual.diagnostics[0]!.message, /can hold outcomes at any depth/);
+  });
+
+  // Regression: a field read on a value obtained through the recursion cut
+  // used to crash, because the cut node has no children while the path did.
+  test("a field can be read through the recursion cut", () => {
+    assert.equal(
+      result(control + "fn name(c: Control) -> String {\n mut n = c.name\n for child in c.children { n = child.name }\n n }").ok,
+      true,
+    );
+  });
+
+  test("recursive traversal and construction type-check", () => {
+    assert.equal(
+      result(control + "fn count(c: Control) -> Int {\n mut t = 1\n for child in c.children { t = t + count(child) }\n t }").ok,
+      true,
+    );
+    assert.equal(
+      result(control + 'fn make() -> Control { Control { name: "a", children: [Control { name: "b", children: [] }] } }').ok,
+      true,
+    );
+  });
+
+  test("admitting recursion does not make a Result inside one disappear", () => {
+    // Control cannot hold a Result at all, so a Result alongside it is still
+    // accounted for exactly as before.
+    const actual = result(
+      control + "enum E { Bad }\nfn make() -> Result<Int,E> { Ok(1) }\nfn probe(c: Control) -> Unit { r = make() }",
+    );
+    assert.equal(actual.ok, false);
+    assert.ok(actual.diagnostics.some(d => d.code === "KODA-T0012"));
+  });
+});

@@ -1,4 +1,7 @@
-// ADR 0007 Slice 2A: reject declaration cycles, even with changed arguments.
+// ADR 0007, Slice 2A and 6C: a declaration cycle is rejected when anything on
+// it can carry responsibility - a type parameter counts, because it might be a
+// Result. Changed arguments never hide a cycle. An admitted recursive type is
+// covered by tests/execution/recursive-data.ko.
 type Box<T> { value: T }
 type Node<T> { next: Node<T>? }
 type Growing<T> { next: Growing<Box<T>>? }
@@ -6,4 +9,3 @@ type Left<T> { right: Right<T>? }
 type Right<T> { left: Left<Box<T>>? }
 enum Chain<T> { End, Next(value: Chain<T>) }
 type ThroughArgument { value: Box<ThroughArgument>? }
-type NullableNode { next: NullableNode? }

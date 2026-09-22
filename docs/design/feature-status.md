@@ -61,7 +61,8 @@ ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principl
 | String slicing, substrings, splitting, case conversion, trimming, ordering | LATER | Still deferred by Q11 | ACCEPTED deferral |
 | Reject local/parameter shadowing and same-scope duplicates | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
 | Ordinary function recursion | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
-| Recursive user-defined data types | LATER | Deferred by Q11 | ACCEPTED deferral |
+| Recursive user-defined data types, non-bearing and inhabitable | ACCEPTED | Slice 6C; cycle must be able to stop and carry no responsibility | ACCEPTED |
+| Responsibility-bearing or generic recursive data | LATER | Rejected, not approximated; generic follows from Model B | AWAITING DECISION |
 | Concrete syntax and operator precedence in syntax spec | ACCEPTED | ADR 0011 and its follow-ups; implementation is staged | ACCEPTED |
 | Traits and composition over inheritance | ACCEPTED | Direction; trait syntax/implementation LATER | AWAITING DECISION |
 | Entity distinct from ordinary application data | ACCEPTED | Direction; ADR 0003 | AWAITING DECISION |

@@ -38,6 +38,18 @@ function abstractResponsibility(type: KType): boolean {
   return type.kind === "Nullable" && abstractResponsibility(type.inner);
 }
 
+/**
+ * The shape a recursive expansion stops at (Slice 6C).
+ *
+ * A node materialised from it has no children, so a path that continues past
+ * the cut finds nothing. That is sound rather than lossy: a cycle is only
+ * admitted when no declaration on it bears, so everything beyond the cut is
+ * provably non-bearing, and a fresh opaque leaf is an exact description of it.
+ */
+function opaque(type: KType): Shape {
+  return { type, kind: "empty", acknowledgment: false, children: new Map(), alternatives: [], bears: false };
+}
+
 function fresh(shape: Shape, since: Span): Node {
   return { shape, state: "outstanding", since, possible: new Set(shape.alternatives), children: new Map([...shape.children].map(([key, member]) => [key, fresh(member.shape, since)])) };
 }
@@ -82,7 +94,12 @@ class ObligationChecker {
   }
   private node(env: Environment, value: Value): Node {
     let node = env.get(value.root)!.node;
-    for (const key of value.path) node = node.children.get(key)!;
+    for (const key of value.path) {
+      const child = node.children.get(key);
+      // Past a recursion cut there are no children, and nothing beyond it can
+      // bear, so an opaque leaf is the whole truth about it (Slice 6C).
+      node = child ?? fresh(opaque(value.type), node.since);
+    }
     return node;
   }
   private temp(env: Environment, node: Node, site: Span): Value {
@@ -244,8 +261,13 @@ class ObligationChecker {
         // Report a discarded projection rather than every sibling on a named root.
         const root = flow.env.get(flow.value.root)!;
         this.reportRoot({ ...root, node: source, name: root.name + flow.value.path.map((_, i) => {
-          let parent = root.node; for (const key of flow.value.path.slice(0, i)) parent = parent.children.get(key)!;
-          return parent.shape.children.get(flow.value.path[i]!)!.label;
+          let parent = root.node;
+          for (const key of flow.value.path.slice(0, i)) {
+            const child = parent.children.get(key);
+            if (!child) return "";
+            parent = child;
+          }
+          return parent.shape.children.get(flow.value.path[i]!)?.label ?? "";
         }).join("") }, Codes.DiscardedResult, statement.span, flow.value.path);
       }
       this.cleanTemps(flow.env, before, statement.span);
@@ -351,7 +373,14 @@ class ObligationChecker {
           : expression.args.map((value, index) => ({ key: payloadKey(expression.variant.index, index), value }));
         for (const entry of entries) flows = flows.flatMap(p => this.expression(entry.value, p.env).map(flow => {
           const destination = this.node(flow.env, result);
-          destination.children.set(entry.key, this.receive(flow.env, flow.value, destination.shape.children.get(entry.key)!.shape.type, entry.value.span));
+          const member = destination.shape.children.get(entry.key);
+          if (member) {
+            destination.children.set(entry.key, this.receive(flow.env, flow.value, member.shape.type, entry.value.span));
+          } else {
+            // Past a recursion cut: nothing there can bear, so account for the
+            // value and move on.
+            this.transfer(flow.env, flow.value);
+          }
           return { env: flow.env, value: result };
         }));
         for (const flow of flows) this.node(flow.env, result).state = "outstanding";

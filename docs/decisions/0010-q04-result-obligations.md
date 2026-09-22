@@ -364,3 +364,41 @@ single-pass flow analysis is sufficient, and Slice 5's R3 still rejects an early
 
 Slice 6A introduces no ownership, no moves, no runtime responsibility tracking
 and no effect summaries. Model B remains unchanged and still provisional.
+
+## 2026-09-22 — why recursive data must not bear (Slice 6C)
+
+Approver: repository owner/user, by explicit Slice 6C decision. This adds no
+responsibility machinery and weakens nothing; it records why recursive data is
+admitted only when it carries no responsibility.
+
+### The problem
+
+Responsibility is tracked structurally: a shape enumerates the stored members a
+value can hold. A recursive declaration describes a structure of unbounded
+depth, so its shape has no finite enumeration. `type Job { result: Result<Int,
+String>, children: List<Job> }` can hold unboundedly many outcomes, and no
+statically finite shape can account for all of them.
+
+### The rule
+
+> A recursive cycle is admitted only when **no declaration on the cycle carries
+> responsibility**. The shape then stops at the point of recursion.
+
+Stopping is sound precisely because nothing on the cycle bears: there is
+provably no responsibility beyond the point where the shape stops, so nothing
+is discarded. Were a declaration on the cycle to bear, stopping would silently
+drop unboundedly many obligations, which is what this ADR exists to prevent.
+That is why the boundary sits exactly where it does, rather than being a
+convenience line.
+
+Bearing is a **least fixed point over declarations**: a declaration bears when
+any stored member reaches a `Result` application, an unconstrained type
+parameter, or another bearing declaration. A declaration whose only
+self-reference is its own cycle therefore does not bear.
+
+### Not introduced
+
+No ownership, no moves, no runtime responsibility tracking, no effect summaries
+and no approximate or unbounded shape. A bearing recursive declaration is
+**rejected**, never tracked imprecisely. Model B is unchanged and still
+provisional; the rejection of generic recursive declarations follows from it.
