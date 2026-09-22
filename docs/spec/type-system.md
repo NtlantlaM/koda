@@ -152,7 +152,31 @@ Primitive equality is supported in v0.1. Q02 requires matching typed numeric ope
 
 Strings have Unicode scalar-value semantics. Equality compares exact scalar-value sequences without normalization; canonical equivalence alone does not make differently represented sequences equal. Invalid/lone surrogate values are rejected at foreign boundaries; Q06 still determines the surrounding conversion/error contract.
 
-String interpolation and multiline strings are supported. ADR 0011 defines their surface spelling and escaping; unresolved multiline layout details remain separate; numeric interpolation follows [Q02's canonical formatting rules](numbers.md); nonnumeric interpolation conversion rules remain to be specified. Direct string indexing and length semantics are deferred. No UTF-16 code-unit indexing or implicit length definition is inherited from JavaScript.
+String interpolation and multiline strings are supported. ADR 0011 defines their surface spelling and escaping; unresolved multiline layout details remain separate; numeric interpolation follows [Q02's canonical formatting rules](numbers.md); nonnumeric interpolation conversion rules remain to be specified.
+
+### Inspecting a string (Slice 6B)
+
+| Operation | Type | Behaviour |
+| --- | --- | --- |
+| `text.length()` | `Int` | how many **scalar values**, not code units |
+| `text.get(index)` | `String?` | the one-scalar string at that position, or `null` when the index names none |
+| `text.startsWith(prefix)` | `Bool` | whether the text begins with `prefix` |
+| `text.endsWith(suffix)` | `Bool` | whether the text ends with `suffix` |
+| `text.contains(value)` | `Bool` | whether `value` occurs anywhere in the text |
+
+**Every operation counts scalar values.** `"A😀B"` has length 3, and `get(1)` is
+`"😀"` - one scalar, not half a surrogate pair. **No UTF-16 code-unit
+indexing or length definition is inherited from JavaScript.** A position that
+names no scalar, negative indexes included, is an *absent value*, so `get`
+returns `String?` rather than a `Result` - the same rule `List.get` follows.
+
+A prefix, suffix or search value is matched as a scalar sequence. Because Koda
+strings never contain a lone surrogate, a match can never begin or end part-way
+through one.
+
+Strings remain immutable, and these operations only read: none of them produces
+a modified string. Slicing, substrings, splitting, case conversion, trimming
+and ordering comparison all remain deferred.
 
 ## Failure boundary
 
@@ -445,13 +469,39 @@ values = []                     // rejected: nothing says what the elements are
 | `items.length()` | `Int` | how many elements |
 | `items.isEmpty()` | `Bool` | whether there are none |
 | `items.get(index)` | `T?` | the element, or `null` when the index is out of range |
+| `items.append(value)` | `List<T>` | a **new** list ending with `value`; `items` is unchanged |
 
 `get` treats every out-of-range index the same way, negative indexes included:
 an index that names no element is an **absent value**, not a failed operation,
 so it is `null` rather than a `Result`. There is no indexing syntax in v0.1.
 
-Building a list other than by writing a literal is not yet possible; `append`
-and other producers are deferred.
+### Building a list
+
+```ko
+numbers = [1, 2]
+more = numbers.append(3)        // numbers is still [1, 2]; more is [1, 2, 3]
+```
+
+`append` is **persistent**: it returns a new list and never changes the one it
+was called on. There is no mutating list operation, and `mut` continues to mean
+*rebind this name*, so the accumulating form reads:
+
+```ko
+mut numbers: List<Int> = []
+numbers = numbers.append(1)
+numbers = numbers.append(2)
+```
+
+which also works inside a loop:
+
+```ko
+mut output: List<String> = []
+for item in input {
+    output = output.append(item)
+}
+```
+
+`prepend`, `concat` and every other producer remain deferred.
 
 ### Iteration
 
@@ -480,6 +530,18 @@ Three rules govern it:
   responsibility for the value it returns and leaves the list responsible for
   everything else. `length()` and `isEmpty()` look at no element at all and
   discharge nothing.
+- **`append` accounts for what it reads.** It takes the list and the value and
+  returns a new list carrying both, so the new list is responsible for
+  everything the old one held. This is the ordinary rule that a read is
+  accounted for and the destination renews — not ownership, and not a move.
+  The original list stays perfectly readable, and reading it again renews a
+  fresh responsibility that must be discharged in its own right:
+
+  ```ko
+  ys = xs.append(makeResult())
+  for r in xs { handle(r) }     // fine - re-reading xs renews
+  for r in ys { handle(r) }     // and ys must be handled too
+  ```
 - **Iterating to normal completion discharges the list**, because a loop visits
   every element. The body must discharge the loop binding on every path that
   reaches the end of the loop.

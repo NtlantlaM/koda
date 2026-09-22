@@ -1,0 +1,92 @@
+// Slice 6A + ADR 0010: append accounts for the list and the value, and the
+// list it returns carries both. This is read-and-renew, not a move: the
+// original stays readable, and re-reading it renews a fresh responsibility.
+type Box<T> { value: T }
+
+fn make() -> Result<Int, String> { Ok(1) }
+fn handle(r: Result<Int, String>) -> Unit { match r { Ok(_) => {}, Err(_) => {} } }
+fn nothing() -> Unit { }
+
+// Rejected: nothing accounts for the appended collection.
+fn newListAbandoned() -> Unit {
+    xs: List<Result<Int,String>> = [make()]
+    ys = xs.append(make())
+}
+
+// Rejected: the original is re-read and then ignored. Nothing disappears
+// merely because append read it.
+fn originalReadThenIgnored() -> Unit {
+    xs: List<Result<Int,String>> = [make()]
+    ys = xs.append(make())
+    for r in ys { handle(r) }
+    for r in xs { nothing() }
+}
+
+// Rejected: an accumulated list nobody handles.
+fn accumulatedAbandoned(input: List<Result<Int,String>>) -> Unit {
+    mut out: List<Result<Int,String>> = []
+    for v in input {
+        out = out.append(v)
+    }
+}
+
+// Rejected: Slice 5 R3 still holds for an accumulating loop.
+fn earlyReturnFromAccumulation(input: List<Result<Int,String>>) -> Int {
+    mut out: List<Result<Int,String>> = []
+    for v in input {
+        out = out.append(v)
+        return 1
+    }
+    for r in out { handle(r) }
+    0
+}
+
+// Rejected: a nested Result inside an appended container.
+fn nestedInContainer() -> Unit {
+    xs: List<Box<Result<Int,String>>> = []
+    ys = xs.append(Box<Result<Int,String>> { value: make() })
+}
+
+// Rejected: a nullable Result element.
+fn nullableElement() -> Unit {
+    xs: List<Result<Int,String>?> = []
+    ys = xs.append(make())
+}
+
+// Accepted, and here on purpose as the boundary of the rule.
+fn newListHandled() -> Unit {
+    xs: List<Result<Int,String>> = [make()]
+    ys = xs.append(make())
+    for r in ys { handle(r) }
+}
+
+fn bothReadIndependently() -> Unit {
+    xs: List<Result<Int,String>> = [make()]
+    ys = xs.append(make())
+    for r in xs { handle(r) }
+    for r in ys { handle(r) }
+}
+
+fn mutSelfRebinding() -> Unit {
+    mut xs: List<Result<Int,String>> = []
+    xs = xs.append(make())
+    xs = xs.append(make())
+    for r in xs { handle(r) }
+}
+
+fn accumulatedThenHandled(input: List<Result<Int,String>>) -> Unit {
+    mut out: List<Result<Int,String>> = []
+    for v in input {
+        out = out.append(v)
+    }
+    for r in out { handle(r) }
+}
+
+fn handedOnward(input: List<Result<Int,String>>) -> List<Result<Int,String>> {
+    input.append(make())
+}
+
+fn nonBearingIsSilent() -> Int {
+    names = ["a"].append("b")
+    names.length()
+}

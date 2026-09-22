@@ -131,6 +131,34 @@ export function ftext(value) {
 }
 
 /**
+ * `text.length()`: how many Unicode scalar values (Slice 6B).
+ *
+ * Koda strings are scalar-value sequences, so this must NOT be JavaScript's
+ * `.length`, which counts UTF-16 code units and would report 4 for "A<emoji>B".
+ * Spreading a string iterates it by code point, which is the scalar sequence.
+ * @param {string} text @returns {bigint}
+ */
+export function slength(text) {
+  return BigInt([...text].length);
+}
+
+/**
+ * `text.get(index)`: the one-scalar string at that position, or Koda's absence.
+ *
+ * Indexing is by scalar value, never by code unit, so `get(1)` of "A<emoji>B"
+ * is the whole emoji rather than half a surrogate pair. An index naming no
+ * scalar - negative ones included - is absence, which is `null`, never
+ * JavaScript's `undefined`.
+ * @param {string} text @param {bigint} index @returns {string | null}
+ */
+export function sget(text, index) {
+  if (index < 0n) return null;
+  const scalars = [...text];
+  if (index >= BigInt(scalars.length)) return null;
+  return scalars[Number(index)];
+}
+
+/**
  * `items.get(index)`: the element, or Koda's absence when the index names none.
  *
  * JavaScript yields `undefined` for an out-of-range read, and `undefined` is

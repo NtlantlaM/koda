@@ -1,0 +1,84 @@
+// Slice 6A: persistent append. The original list is never changed.
+import { print } from "koda:io"
+
+type User { name: String }
+
+fn describe(users: List<User>) -> String {
+    found = users.get(0)
+    match found {
+        null => "nobody"
+        present => present.name
+    }
+}
+
+fn accumulate(input: List<String>) -> List<String> {
+    mut out: List<String> = []
+    for item in input {
+        out = out.append(item)
+    }
+    out
+}
+
+fn sideEffect(n: Int) -> Int {
+    print("evaluating {n}")
+    n
+}
+
+fn buildFloats() -> List<Float> {
+    empty: List<Float> = []
+    // Ordinary contextual retargeting reaches the argument.
+    empty.append(1).append(2.5)
+}
+
+export fn main() -> Unit {
+    // Append to an empty list, then a non-empty one.
+    start: List<Int> = []
+    one = start.append(1)
+    two = one.append(2)
+    print("{start.length()} {one.length()} {two.length()}")
+
+    // The originals are unchanged.
+    for n in one { print("one {n}") }
+    for n in two { print("two {n}") }
+
+    // Repeated append in a chain.
+    chained = two.append(3).append(4)
+    print("{chained.length()}")
+
+    // Records.
+    users = [User { name: "Thandi" }].append(User { name: "Kagiso" })
+    print("{users.length()} {describe(users)}")
+
+    // Nested lists.
+    rows: List<List<Int>> = [[1, 2]]
+    moreRows = rows.append([3, 4])
+    print("{rows.length()} {moreRows.length()}")
+    for row in moreRows {
+        for n in row { print("cell {n}") }
+    }
+
+    // Nullable element values.
+    maybes: List<Int?> = [1]
+    withNull = maybes.append(null)
+    for m in withNull {
+        match m {
+            null => print("absent")
+            present => print("present {present}")
+        }
+    }
+
+    // mut self-rebinding.
+    mut acc: List<Int> = []
+    acc = acc.append(10)
+    acc = acc.append(20)
+    print("{acc.length()}")
+
+    // Accumulation in a loop.
+    for s in accumulate(["a", "b", "c"]) { print(s) }
+
+    // Evaluation order: receiver before value.
+    ordered = [sideEffect(1)].append(sideEffect(2))
+    print("{ordered.length()}")
+
+    for f in buildFloats() { print("{f}") }
+}

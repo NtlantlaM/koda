@@ -45,6 +45,14 @@ ACCEPTED means an accepted design direction, not shipped functionality or necess
 - [Slice 3C: core correctness repairs](implementation/slice-3c.md) records
   operand evaluation order, extreme numeric literals and nested-block newlines.
 
+- [Slice 6B: string inspection](implementation/slice-6b.md) records scalar-value
+  `length`, `get`, `startsWith`, `endsWith` and `contains`, and why native
+  matching is scalar-correct.
+
+- [Slice 6A: persistent list construction](implementation/slice-6a.md) records
+  `List.append`, why it is a producer rather than an observer, and why loop
+  accumulation needs no fixed-point analysis.
+
 - [Slice 5: immutable lists and iteration](implementation/slice-5.md) records
   `List<T>`, literals, `get`/`length`/`isEmpty`, `for` loops and the collective
   responsibility rules R1/R2/R3.

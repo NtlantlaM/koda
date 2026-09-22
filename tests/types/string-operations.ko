@@ -1,0 +1,41 @@
+// Slice 6B: string operations are read-only, scalar-counted, and closed.
+// One rejection per function.
+fn nonStringNeedle() -> Unit {
+    b = "abc".startsWith(1)
+}
+
+fn nonIntIndex() -> Unit {
+    c = "abc".get("a")
+}
+
+fn lengthTakesNothing() -> Unit {
+    n = "abc".length(1)
+}
+
+fn getNeedsAnIndex() -> Unit {
+    c = "abc".get()
+}
+
+fn containsNeedsAValue() -> Unit {
+    b = "abc".contains()
+}
+
+fn unknownOperation() -> Unit {
+    x = "abc".substring(0, 1)
+}
+
+fn sliceStillDeferred() -> Unit {
+    x = "abc".slice(0, 1)
+}
+
+fn caseConversionStillDeferred() -> Unit {
+    x = "abc".toUpperCase()
+}
+
+fn orderingStillRejected(a: String, b: String) -> Bool {
+    a < b
+}
+
+fn getIsNullableNotString() -> String {
+    "abc".get(0)
+}

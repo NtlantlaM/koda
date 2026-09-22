@@ -290,3 +290,60 @@ representation, no inference contract, and no standard-library design.
 See [type-system rules](../spec/type-system.md#lists-slice-5) and the
 [implementation boundary](../implementation/slice-5.md). The responsibility
 rules are recorded in [ADR 0010](0010-q04-result-obligations.md).
+
+## 2026-09-22 — accepted persistent list construction (Slice 6A)
+
+Approver: repository owner/user, by explicit Slice 6A acceptance and
+implementation authorization. This is a clarification of Q11 and selects no Q08
+representation, no inference, and no mutable collection model.
+
+- `List<T>.append(value: T) -> List<T>` is a compiler-known operation taking
+  exactly one argument, checked against the instantiated element type, and
+  returning exactly `List<T>`. Invariance is unchanged.
+- **`append` is persistent.** It returns a new list and never changes the list
+  it was called on. There is no mutating list operation of any kind, and `mut`
+  continues to mean rebinding a name.
+- Ordinary contextual rules apply to the argument, so numeral retargeting
+  inside `xs.append(1)` on a `List<Float>` behaves exactly as it does anywhere
+  else. Nested lists, records, enums and nullable element types all follow.
+- On a generic `List<T>` receiver, append follows the existing Slice 4A rules
+  without change; no generic inference is introduced.
+- `prepend`, `concat`, indexing, `map`, `filter`, `reduce` and every other list
+  operation remain outside this decision. Their future acceptance is not
+  withdrawn.
+
+See [type-system rules](../spec/type-system.md#building-a-list) and the
+[implementation boundary](../implementation/slice-6a.md). The responsibility
+rule is recorded in [ADR 0010](0010-q04-result-obligations.md).
+
+## 2026-09-22 — accepted string inspection (Slice 6B)
+
+Approver: repository owner/user, by explicit Slice 6B acceptance and
+implementation authorization. This is a clarification of Q11, and it partially
+lifts this ADR's own deferral of "direct string indexing and length semantics".
+It selects no Q08 representation and no foreign-boundary contract.
+
+- Five compiler-known read-only operations on `String`:
+  `length() -> Int`, `get(index) -> String?`, `startsWith(prefix) -> Bool`,
+  `endsWith(suffix) -> Bool` and `contains(value) -> Bool`.
+- **All of them count Unicode scalar values.** `"A<emoji>B".length()` is 3, and
+  `get(1)` is the emoji itself. No UTF-16 code-unit length or indexing is
+  inherited from JavaScript, and an implementation may not expose one.
+- `get` returns the one-scalar string at that position. An index that names no
+  scalar, **negative indexes included**, is an absent value, so the result is
+  `String?` rather than a `Result`. This follows `List.get` exactly: a position
+  that names nothing is absence, not a failed operation.
+- `startsWith`, `endsWith` and `contains` match a scalar sequence. Koda strings
+  contain no lone surrogates, so a match can never begin or end part-way through
+  a surrogate pair.
+- Strings remain immutable. These operations only read; none produces a
+  modified string, and no string mutation exists.
+- Slicing and substrings, splitting, joining, case conversion, trimming,
+  replacement, ordering comparison and code-point conversion all remain
+  deferred. The wider deferral of a general string library is unchanged.
+- These are compiler-known operations for now, for the same reason the list
+  operations are: Koda cannot yet express them as library code. That remains
+  provisional and is recorded with the Slice 5 asymmetry.
+
+See [type-system rules](../spec/type-system.md#inspecting-a-string-slice-6b)
+and the [implementation boundary](../implementation/slice-6b.md).

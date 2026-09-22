@@ -1,0 +1,73 @@
+// Slice 6B: string inspection counts Unicode scalar values, never UTF-16
+// code units. "A😀B" is three scalars, and index 1 is the whole emoji.
+import { print } from "koda:io"
+
+fn show(value: String?) -> String {
+    match value {
+        null => "(none)"
+        present => present
+    }
+}
+
+fn yes(flag: Bool) -> String {
+    if flag { "true" } else { "false" }
+}
+
+fn scalarsOf(text: String) -> List<String> {
+    mut out: List<String> = []
+    mut index = 0
+    for _ignored in [1, 2, 3] {
+        found = text.get(index)
+        match found {
+            null => { }
+            present => { out = out.append(present) }
+        }
+        index = index + 1
+    }
+    out
+}
+
+export fn main() -> Unit {
+    astral = "A😀B"
+    plain = "Button1"
+    empty = ""
+
+    // Length is scalar-counted: JavaScript would say 4 for this string.
+    print("{astral.length()} {plain.length()} {empty.length()}")
+
+    // Indexing is scalar-counted too.
+    print(show(astral.get(0)))
+    print(show(astral.get(1)))
+    print(show(astral.get(2)))
+
+    // Out of range and negative are absence, not failure.
+    print(show(astral.get(3)))
+    print(show(astral.get(0 - 1)))
+    print(show(empty.get(0)))
+
+    // Predicates, including across an astral boundary.
+    print(yes(astral.startsWith("A")))
+    print(yes(astral.startsWith("A😀")))
+    print(yes(astral.startsWith("B")))
+    print(yes(astral.endsWith("B")))
+    print(yes(astral.endsWith("😀B")))
+    print(yes(astral.endsWith("A")))
+    print(yes(astral.contains("😀")))
+    print(yes(astral.contains("AB")))
+
+    // Empty needles and empty receivers.
+    print(yes(plain.startsWith("")))
+    print(yes(plain.endsWith("")))
+    print(yes(plain.contains("")))
+    print(yes(empty.startsWith("x")))
+    print(yes(empty.contains("")))
+
+    // The rule the inspector actually needs.
+    print(yes(plain.startsWith("btn_")))
+    print(yes("btn_Submit".startsWith("btn_")))
+
+    // A string walked one scalar at a time.
+    for scalar in scalarsOf(astral) {
+        print("scalar {scalar}")
+    }
+}

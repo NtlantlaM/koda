@@ -1,0 +1,203 @@
+// Power Apps Inspector - Koda dogfood #1
+//
+// The beginning of a real Power Apps inspection tool. This is an application,
+// not a compiler fixture: it is written only with what Koda supports today,
+// and where Koda cannot express a rule the rule is left unimplemented and
+// marked, rather than faked.
+//
+// Run it with:
+//     koda run examples/power-apps-inspector/main.ko
+//
+// ---------------------------------------------------------------------------
+// Slice 6B added scalar-value string inspection, so the naming rule this tool
+// exists for is now implemented for real:
+//
+//     Button    -> btn_
+//     Gallery   -> gal_
+//     TextInput -> txt_
+//
+// Still out of reach: slicing and substrings, splitting, case conversion and
+// ordering, so the tool cannot yet suggest a corrected name or compare names
+// case-insensitively.
+// ---------------------------------------------------------------------------
+
+import { print } from "koda:io"
+
+type Control {
+    name: String
+    kind: String
+}
+
+type Issue {
+    control: String
+    message: String
+}
+
+// The naming convention, as data. Returning "" means "kind not recognised".
+fn expectedPrefix(kind: String) -> String {
+    if kind == "Button" {
+        "btn_"
+    } else if kind == "Gallery" {
+        "gal_"
+    } else if kind == "TextInput" {
+        "txt_"
+    } else if kind == "Label" {
+        "lbl_"
+    } else {
+        ""
+    }
+}
+
+fn isKnownKind(kind: String) -> Bool {
+    expectedPrefix(kind) != ""
+}
+
+// --- Checks -----------------------------------------------------------------
+
+fn checkNamePresent(control: Control) -> List<Issue> {
+    if control.name == "" {
+        [Issue { control: "(unnamed)", message: "control has no name" }]
+    } else {
+        []
+    }
+}
+
+fn checkKindRecognised(control: Control) -> List<Issue> {
+    if isKnownKind(control.kind) {
+        []
+    } else {
+        [Issue { control: control.name, message: "unrecognised control kind '{control.kind}'" }]
+    }
+}
+
+// The rule this tool exists for.
+fn checkNaming(control: Control) -> List<Issue> {
+    prefix = expectedPrefix(control.kind)
+    if prefix == "" {
+        []
+    } else if control.name == "" {
+        // A missing name is already reported; do not pile a naming verdict on it.
+        []
+    } else if control.name.startsWith(prefix) {
+        []
+    } else {
+        [Issue {
+            control: control.name,
+            message: "Naming issue: {control.kind} should use {prefix}"
+        }]
+    }
+}
+
+fn followsConvention(control: Control) -> Bool {
+    prefix = expectedPrefix(control.kind)
+    if prefix == "" { false } else { control.name.startsWith(prefix) }
+}
+
+// Duplicate names, found by comparing every control against every other.
+// Koda has no index-based loop, so a pair can only be compared symmetrically:
+// this reports the clash once from each side. That is a real limitation, left
+// visible rather than hidden.
+fn countByName(controls: List<Control>, name: String) -> Int {
+    mut seen = 0
+    for other in controls {
+        if other.name == name {
+            seen = seen + 1
+        }
+    }
+    seen
+}
+
+fn checkNameUnique(controls: List<Control>, control: Control) -> List<Issue> {
+    if countByName(controls, control.name) > 1 {
+        [Issue { control: control.name, message: "duplicate control name" }]
+    } else {
+        []
+    }
+}
+
+fn collect(into: List<Issue>, found: List<Issue>) -> List<Issue> {
+    mut all = into
+    for issue in found {
+        all = all.append(issue)
+    }
+    all
+}
+
+fn inspect(controls: List<Control>) -> List<Issue> {
+    mut issues: List<Issue> = []
+    for control in controls {
+        issues = collect(issues, checkNamePresent(control))
+        issues = collect(issues, checkKindRecognised(control))
+        issues = collect(issues, checkNaming(control))
+        issues = collect(issues, checkNameUnique(controls, control))
+    }
+    issues
+}
+
+// --- Reporting ---------------------------------------------------------------
+
+fn verdict(control: Control) -> String {
+    prefix = expectedPrefix(control.kind)
+    if prefix == "" {
+        "  no convention known for kind '{control.kind}'"
+    } else if followsConvention(control) {
+        "  OK"
+    } else {
+        "  Naming issue: {control.kind} should use {prefix}"
+    }
+}
+
+fn report(controls: List<Control>) -> Unit {
+    for control in controls {
+        print(control.name)
+        print(verdict(control))
+        print("")
+    }
+}
+
+export fn main() -> Unit {
+    controls = [
+        Control { name: "Button1", kind: "Button" },
+        Control { name: "btn_Submit", kind: "Button" },
+        Control { name: "Gallery1", kind: "Gallery" },
+        Control { name: "gal_Orders", kind: "Gallery" },
+        Control { name: "TextInput1", kind: "TextInput" },
+        Control { name: "txt_Search", kind: "TextInput" },
+    ]
+
+    print("Power Apps Inspector")
+    print("")
+    print("Checking {controls.length()} controls...")
+    print("")
+
+    report(controls)
+
+    issues = inspect(controls)
+
+    print("{controls.length()} controls checked")
+    print("{issues.length()} issues found")
+
+    for issue in issues {
+        print("  {issue.control}: {issue.message}")
+    }
+
+    // The structural checks also work; this screen proves it on data that
+    // violates them.
+    print("")
+    print("--- self-check on deliberately broken input ---")
+
+    broken = [
+        Control { name: "", kind: "Button" },
+        Control { name: "Widget1", kind: "Accordion" },
+        Control { name: "Shared", kind: "Label" },
+        Control { name: "Shared", kind: "Label" },
+    ]
+
+    brokenIssues = inspect(broken)
+    print("{broken.length()} controls checked")
+    print("{brokenIssues.length()} issues found")
+
+    for issue in brokenIssues {
+        print("  {issue.control}: {issue.message}")
+    }
+}

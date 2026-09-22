@@ -116,6 +116,15 @@ iterated, iterated with the binding ignored, read only through `get`,
 or abandoned by an early `return` from the loop. Structural paths render the
 collective element as `[]`, so a nested case reads `results[].value`.
 
+Slice 6B's string operations introduce no code of their own: `KODA-T0001` for a
+non-String argument or a non-Int index, `KODA-T0006` for wrong arity, and
+`KODA-T0009` for an unknown operation on a string.
+
+Slice 6A's `append` introduces no code of its own: `KODA-T0001` for an argument
+that does not match the element type, `KODA-T0006` for wrong arity,
+`KODA-T0009` for an unknown operation on a list, and `KODA-T0012` for an
+accumulated list nobody accounted for.
+
 An empty-literal diagnostic states that Koda cannot know the element type and
 does not invent one; it offers an annotation, a return type or a parameter
 position, and never offers inference.

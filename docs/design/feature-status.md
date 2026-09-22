@@ -57,7 +57,8 @@ ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principl
 | Unicode scalar-value strings; exact non-normalizing equality | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
 | Reject invalid/lone surrogates at foreign boundaries | ACCEPTED | Q11; error/adapter contract remains Q06 | ACCEPTED requirement |
 | String interpolation and multiline strings | ACCEPTED | ADR 0011 surface accepted; remaining layout/conversion details separate | ACCEPTED |
-| Direct string indexing and length semantics | LATER | Deferred by Q11 | ACCEPTED deferral |
+| Scalar-value `String.length`, `get`, `startsWith`, `endsWith`, `contains` | ACCEPTED | Slice 6B; read-only, scalar-counted, `get` returns `String?` | ACCEPTED |
+| String slicing, substrings, splitting, case conversion, trimming, ordering | LATER | Still deferred by Q11 | ACCEPTED deferral |
 | Reject local/parameter shadowing and same-scope duplicates | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
 | Ordinary function recursion | ACCEPTED | Q11 / ADR 0007 | ACCEPTED |
 | Recursive user-defined data types | LATER | Deferred by Q11 | ACCEPTED deferral |
@@ -78,7 +79,8 @@ ACCEPTED does not mean it is implemented. ACCEPTED covers user-supplied principl
 | `for`/`in` reserved words | ACCEPTED | Slice 5; intentional pre-1.0 source compatibility change | ACCEPTED |
 | Collective list responsibility; R1 normal completion, R2 read renews, R3 early return | ACCEPTED | ADR 0010 follow-up, 2026-09-22 | ACCEPTED |
 | Intrinsic list operations may know what user generics cannot | **PROVISIONAL** | Slice 5; must be revisited before a List stdlib, map/filter/reduce or user generic collection abstractions | AWAITING DECISION |
-| `append` and other list producers | LATER | Deferred from Slice 5; lists are built only by literal | AWAITING DECISION |
+| Persistent `List.append`, returning a new list | ACCEPTED | Slice 6A; original never changed, no mutating operation exists | ACCEPTED |
+| `prepend`, `concat` and other list producers | LATER | Deferred from Slice 6A | AWAITING DECISION |
 | `break` / `continue` | LATER | Deferred; they create partial-iteration responsibility edges | AWAITING DECISION |
 | Indexing syntax `items[i]` | LATER | Deferred from Slice 5 | AWAITING DECISION |
 | Maps, sets, comprehensions, map/filter/reduce, closures | LATER | Add only with motivating cases; transformations need generic-effect design first | AWAITING DECISION |

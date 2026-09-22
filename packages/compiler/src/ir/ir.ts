@@ -144,8 +144,14 @@ export interface IRList extends IRNode {
   readonly elements: readonly IRExpression[];
 }
 
-/** The list operations the compiler knows: `length`, `isEmpty`, `get`. */
-export type ListOperation = "length" | "isEmpty" | "get";
+/**
+ * The list operations the compiler knows.
+ *
+ * `length`, `isEmpty` and `get` are observers: they read the receiver without
+ * accounting for it (ADR 0010, R2). `append` is the one producer: it accounts
+ * for the receiver and the value, and its result carries both (Slice 6A).
+ */
+export type ListOperation = "length" | "isEmpty" | "get" | "append";
 
 /**
  * A compiler-known list operation (Slice 5).
@@ -159,8 +165,26 @@ export interface IRListOp extends IRNode {
   readonly kind: "list-op";
   readonly operation: ListOperation;
   readonly target: IRExpression;
-  /** Present only for `get`. */
+  /** The index for `get`, or the value for `append`; null for an observer. */
   readonly index: IRExpression | null;
+}
+
+/** The string operations the compiler knows (Slice 6B). All are read-only. */
+export type StringOperation = "length" | "get" | "startsWith" | "endsWith" | "contains";
+
+/**
+ * A compiler-known string operation (Slice 6B).
+ *
+ * A separate node rather than a call, mirroring `IRListOp`. Far simpler than
+ * the list case: `String`, `Bool`, `Int` and `String?` all bear no
+ * responsibility, so there is no observer/producer distinction to make.
+ */
+export interface IRStringOp extends IRNode {
+  readonly kind: "string-op";
+  readonly operation: StringOperation;
+  readonly target: IRExpression;
+  /** The index for `get`, the needle for the predicates; null for `length`. */
+  readonly argument: IRExpression | null;
 }
 
 export interface IRCall extends IRNode {
@@ -348,6 +372,7 @@ export type IRExpression =
   | IRCall
   | IRList
   | IRListOp
+  | IRStringOp
   | IRIntArith
   | IRIntNegate
   | IRFloatArith

@@ -31,8 +31,12 @@ generic value construction, explicit and contextual, so a user-defined generic
 type can finally hold a value. [Slice 3B](docs/implementation/slice-3b.md) adds structural Result responsibility, receiver renewal and conditional payload tracking. [Slice 4A](docs/implementation/slice-4a.md)
 adds explicit generic functions and explicit generic calls, with type arguments
 always written. [Slice 5](docs/implementation/slice-5.md) adds an immutable
-`List<T>` with literals, `get`/`length`/`isEmpty` and `for` iteration.
-Type-argument inference, list producers such as `append`, recursive data,
+`List<T>` with literals, `get`/`length`/`isEmpty` and `for` iteration, and
+[slice 6A](docs/implementation/slice-6a.md) adds persistent `append`, so a
+program can build lists rather than only write them, and
+[slice 6B](docs/implementation/slice-6b.md) adds scalar-value string inspection:
+`length`, `get`, `startsWith`, `endsWith` and `contains`.
+Type-argument inference, string slicing, recursive data,
 multi-module programs and npm
 interop are **not** implemented. There
 is no formatter, test runner or package manager. Some `examples/` programs use

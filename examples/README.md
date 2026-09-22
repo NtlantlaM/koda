@@ -20,8 +20,23 @@ must-handle enforcement in place it now compiles. Examples beyond the documented
 future integration targets; their presence does not settle missing inference or library API
 decisions.
 
+## Dogfood applications
+
+`power-apps-inspector/` is the first real Koda **application** rather than a
+design sketch: the beginning of a Power Apps inspection tool. It compiles and
+runs today. It also documents, in its own source, the one rule it could not
+implement - a naming-convention prefix check - because Koda's String surface is
+currently `==`, `!=`, `+` and interpolation only, with no length, indexing,
+substring or `startsWith`. The rule is left unimplemented and marked rather
+than faked.
+
+```bash
+koda run examples/power-apps-inspector/main.ko
+```
+
 | Example | What it demonstrates | Expected output once implemented |
 | --- | --- | --- |
+| [power-apps-inspector/main.ko](power-apps-inspector/main.ko) | Records, `List`, `for`, `append` accumulation and helper functions in a real tool; marks the blocked String prefix check | Runs today; see the file header |
 | [hello.ko](core/hello.ko) | Entry function and explicit standard import | `Hello, Koda!` |
 | [data-and-null.ko](core/data-and-null.ko) | Ordinary `type`, nominal records, `T?`, nullable match | `Ada`, then `Anonymous` |
 | [results-and-enums.ko](core/results-and-enums.ko) | Associated data, explicit Result handling | `Hello, Ada`, then `Name is required` |

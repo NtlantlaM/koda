@@ -238,3 +238,132 @@ describe("list lowering", () => {
     assert.doesNotMatch(module.contents, /List|Int\b/);
   });
 });
+
+// Slice 6A: append is a producer - it accounts for what it reads and its
+// result carries it. That is read-and-renew, not a move.
+describe("list append responsibility", () => {
+  const lists = `fn all() -> List<Result<Int,E>> { [make()] }
+fn nothing() -> Unit {}
+`;
+  function appendCase(source: string, codes: string[]) {
+    const actual = check({ readFile: () => common + lists + source }, { path: "obligations.ko" });
+    assert.deepEqual(actual.diagnostics.map(d => d.code), codes, JSON.stringify(actual.diagnostics));
+    assert.equal(actual.ok, codes.length === 0);
+  }
+
+  test("the appended list carries what the original held", () => {
+    appendCase("fn probe() -> Unit { ys = all().append(make())\n for r in ys { handle(r) } }", []);
+    appendCase("fn probe() -> Unit { ys = all().append(make()) }", ["KODA-T0012"]);
+  });
+
+  // The original must stay readable: append is not a move.
+  test("the original re-reads and renews rather than being consumed", () => {
+    appendCase(
+      "fn probe() -> Unit { xs = all()\n ys = xs.append(make())\n for r in xs { handle(r) }\n for r in ys { handle(r) } }",
+      [],
+    );
+  });
+
+  // ...and nothing disappears merely because append read it.
+  test("a re-read that is ignored is still reported", () => {
+    appendCase(
+      "fn probe() -> Unit { xs = all()\n ys = xs.append(make())\n for r in ys { handle(r) }\n for r in xs { nothing() } }",
+      ["KODA-T0012"],
+    );
+  });
+
+  test("mut self-rebinding needs no overwrite exception", () => {
+    appendCase(
+      "fn probe() -> Unit { mut xs: List<Result<Int,E>> = []\n xs = xs.append(make())\n xs = xs.append(make())\n for r in xs { handle(r) } }",
+      [],
+    );
+  });
+
+  test("loop accumulation needs no fixed point, and R3 still holds", () => {
+    appendCase(
+      "fn probe(input: List<Result<Int,E>>) -> Unit { mut out: List<Result<Int,E>> = []\n for v in input { out = out.append(v) }\n for r in out { handle(r) } }",
+      [],
+    );
+    appendCase(
+      "fn probe(input: List<Result<Int,E>>) -> Unit { mut out: List<Result<Int,E>> = []\n for v in input { out = out.append(v) } }",
+      ["KODA-T0012"],
+    );
+  });
+
+  test("observers still do not discharge, so append is the only producer", () => {
+    appendCase("fn probe() -> Int { xs = all()\n xs.length() }", ["KODA-T0012"]);
+    appendCase("fn probe() -> Unit { xs = all()\n ys = xs.append(make())\n for r in ys { handle(r) } }", []);
+  });
+});
+
+// Slice 6A: append is persistent at runtime.
+describe("list append lowering", () => {
+  test("append copies rather than mutating, and evaluates in written order", () => {
+    const emitted = build(
+      { readFile: () => "export fn main() -> Unit { xs = [1]\n ys = xs.append(2)\n other(ys) }\nfn other(l: List<Int>) -> Unit {}" },
+      { path: "append.ko", moduleFileName: "m.js" },
+    );
+    assert.ok(emitted.ok, JSON.stringify(emitted.diagnostics));
+    const module = emitted.artifacts.find(a => a.fileName === "m.js")!;
+    assert.match(module.contents, /\[\.\.\.k_xs, 2n\]/);
+    // Nothing may mutate the source list.
+    assert.doesNotMatch(module.contents, /\.push\(|\.splice\(|freeze/);
+  });
+});
+
+// Slice 6B: string operations count scalar values, never UTF-16 code units.
+describe("string inspection", () => {
+  function run(source: string) {
+    return build({ readFile: () => source }, { path: "strings.ko", moduleFileName: "m.js" });
+  }
+
+  test("length and get lower through scalar-counting helpers", () => {
+    const emitted = run(
+      'export fn main() -> Unit { n = "a".length()\n c = "a".get(0)\n use(n, c) }\nfn use(n: Int, c: String?) -> Unit {}',
+    );
+    assert.ok(emitted.ok, JSON.stringify(emitted.diagnostics));
+    const module = emitted.artifacts.find(a => a.fileName === "m.js")!;
+    assert.match(module.contents, /\$k\.slength\(/);
+    assert.match(module.contents, /\$k\.sget\(/);
+    // JavaScript's own `.length` counts code units and must never be used.
+    assert.doesNotMatch(module.contents, /"a"\.length\b/);
+  });
+
+  test("predicates lower to native matching, which is scalar-correct here", () => {
+    const emitted = run(
+      'export fn main() -> Unit { a = "x".startsWith("y")\n b = "x".endsWith("y")\n c = "x".contains("y")\n use(a, b, c) }\nfn use(a: Bool, b: Bool, c: Bool) -> Unit {}',
+    );
+    assert.ok(emitted.ok, JSON.stringify(emitted.diagnostics));
+    const module = emitted.artifacts.find(a => a.fileName === "m.js")!;
+    assert.match(module.contents, /\.startsWith\(/);
+    assert.match(module.contents, /\.endsWith\(/);
+    assert.match(module.contents, /\.includes\(/);
+  });
+
+  test("get is nullable, so it cannot be used as a String directly", () => {
+    const result = check({ readFile: () => 'fn f() -> String { "abc".get(0) }' }, { path: "strings.ko" });
+    assert.equal(result.ok, false);
+    assert.equal(result.diagnostics[0]?.code, "KODA-T0002");
+  });
+
+  test("the string operation surface is closed", () => {
+    for (const source of [
+      'fn f() -> Unit { x = "a".substring(0, 1) }',
+      'fn f() -> Unit { x = "a".split(",") }',
+      'fn f() -> Unit { x = "a".trim() }',
+    ]) {
+      const result = check({ readFile: () => source }, { path: "strings.ko" });
+      assert.equal(result.ok, false, source);
+      assert.ok(result.diagnostics.some(d => d.code === "KODA-T0009"), source);
+    }
+  });
+
+  test("a string operation carries no responsibility", () => {
+    // Strings never bear, so nothing here may be reported.
+    const result = check(
+      { readFile: () => 'fn f(text: String) -> Bool { text.startsWith("a") }' },
+      { path: "strings.ko" },
+    );
+    assert.equal(result.ok, true, JSON.stringify(result.diagnostics));
+  });
+});

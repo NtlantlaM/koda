@@ -310,3 +310,57 @@ It **must** be revisited before any of:
 
 Slice 5 deliberately introduces no effect summaries, no does-not-consume
 annotations, no ownership, no moves and no polymorphic effect inference.
+
+## 2026-09-22 — accepted responsibility for list construction (Slice 6A)
+
+Approver: repository owner/user, by explicit Slice 6A decision. This introduces
+no new responsibility machinery; it records which existing rule `append` falls
+under, and why.
+
+### Observers and producers
+
+The compiler-known list operations divide in two, and the division is load
+bearing:
+
+- **Observers** — `length`, `isEmpty`, `get`. They read the receiver without
+  accounting for it. Slice 5's R2 keeps the list responsible for every element
+  it holds, because reading one element proves nothing about the others.
+- **Producer** — `append`. It accounts for the list *and* the value, and
+  returns a new list that carries both. The new list is responsible for
+  everything the old one held.
+
+### `append` uses the ordinary rule
+
+> `append` takes its receiver and its value the way any operation takes what it
+> reads, and the list it returns renews responsibility for both.
+
+This is the existing rule that a read is accounted for and the destination
+renews. It is **not** ownership, **not** a move, and **not** an append-specific
+exception to the overwrite rule:
+
+- The original list stays readable. Reading it again renews a fresh
+  responsibility, which must then be discharged on its own:
+
+  ```ko
+  ys = xs.append(makeResult())
+  for r in xs { handle(r) }     // accepted - the re-read renews
+  for r in ys { handle(r) }     // and ys must be handled too
+  ```
+
+- Reading the original again and *ignoring* it is still reported. Nothing
+  disappears merely because `append` read the list.
+- `mut xs = xs.append(v)` is accepted without a special case: the right-hand
+  side accounts for the old generation before the rebinding happens, so there is
+  no outstanding previous generation to overwrite. The same holds inside a loop.
+- An accumulated list that is never handled is still reported.
+
+### No fixed point is required
+
+Accumulation in a loop needs no iteration-count reasoning. Each step accounts
+for the old generation and renews a new one, so the abstract state after one
+analysed pass is the state after any number of runtime iterations. The existing
+single-pass flow analysis is sufficient, and Slice 5's R3 still rejects an early
+`return` out of an accumulating loop.
+
+Slice 6A introduces no ownership, no moves, no runtime responsibility tracking
+and no effect summaries. Model B remains unchanged and still provisional.

@@ -272,6 +272,9 @@ class Emitter {
       case "list-op":
         return Emitter.needsStatements(expression.target)
           || (expression.index !== null && Emitter.needsStatements(expression.index));
+      case "string-op":
+        return Emitter.needsStatements(expression.target)
+          || (expression.argument !== null && Emitter.needsStatements(expression.argument));
       case "interpolate":
         return expression.parts.some((part) => part.kind === "value" && Emitter.needsStatements(part.value));
       case "record":
@@ -328,7 +331,30 @@ class Emitter {
         return `[${this.lowerOperands(expression.elements).join(", ")}]`;
       }
 
+      case "string-op": {
+        if (expression.operation === "length") {
+          // Scalar values, never UTF-16 code units.
+          return `${RUNTIME}.slength(${this.lowerValue(expression.target)})`;
+        }
+        const operands = this.lowerOperands([expression.target, expression.argument!]);
+        if (expression.operation === "get") {
+          return `${RUNTIME}.sget(${operands[0]!}, ${operands[1]!})`;
+        }
+        // A Koda string holds no lone surrogate, so a code-unit match can never
+        // begin or end part-way through a surrogate pair: these agree with
+        // scalar matching and need no helper.
+        const method = expression.operation === "contains" ? "includes" : expression.operation;
+        return `${operands[0]!}.${method}(${operands[1]!})`;
+      }
+
       case "list-op": {
+        if (expression.operation === "append") {
+          // Persistent: a fresh array, never a mutation of the source. An
+          // array literal evaluates in written order, so the receiver runs
+          // before the value, exactly as Koda states.
+          const operands = this.lowerOperands([expression.target, expression.index!]);
+          return `[...${operands[0]!}, ${operands[1]!}]`;
+        }
         if (expression.operation === "get") {
           const operands = this.lowerOperands([expression.target, expression.index!]);
           // Out of range must be Koda's absence, never JavaScript's undefined.

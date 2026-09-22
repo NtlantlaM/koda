@@ -309,16 +309,35 @@ class ObligationChecker {
         });
       }
 
-      case "list-op": {
-        // ADR 0010 R2. `length` and `isEmpty` inspect no element. `get` renews a
-        // responsibility for the value it returns. None of them consumes the
-        // receiver, so the collection stays responsible for the rest.
+      case "string-op": {
+        // Slice 6B: a String, Bool, Int and String? all bear nothing, so these
+        // only need their operands walked for nested control flow.
         let flows = this.expression(expression.target, env);
-        if (expression.index) flows = flows.flatMap(flow => this.expression(expression.index!, flow.env).map(next => ({
-          env: next.env,
-          value: flow.value,
-        })));
+        if (expression.argument) {
+          flows = flows.flatMap(flow => this.expression(expression.argument!, flow.env));
+        }
         return flows.map(flow => ({ env: flow.env, value: this.unknown(flow.env, expression.type, expression.span) }));
+      }
+
+      case "list-op": {
+        // Observers (`length`, `isEmpty`, `get`) read the receiver without
+        // accounting for it, so the collection stays responsible for every
+        // element it holds (ADR 0010 R2). `append` is the one producer: it
+        // accounts for the receiver and the value, and its result carries
+        // both (Slice 6A). That is the ordinary read-and-renew rule, not a
+        // move - re-reading the original renews it again.
+        const produces = expression.operation === "append";
+        let flows = this.expression(expression.target, env);
+        if (expression.index) {
+          flows = flows.flatMap(flow => this.expression(expression.index!, flow.env).map(next => {
+            if (produces) this.transfer(next.env, next.value);
+            return { env: next.env, value: flow.value };
+          }));
+        }
+        return flows.map(flow => {
+          if (produces) this.transfer(flow.env, flow.value);
+          return { env: flow.env, value: this.unknown(flow.env, expression.type, expression.span) };
+        });
       }
 
       case "record": case "variant": {

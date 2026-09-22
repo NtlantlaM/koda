@@ -1,0 +1,43 @@
+// Slice 6A: append typing. One rejection per function.
+type User { name: String }
+
+fn wrongElementType() -> Unit {
+    xs = [1, 2]
+    ys = xs.append("three")
+}
+
+fn wrongArityTooMany() -> Unit {
+    xs = [1]
+    ys = xs.append(2, 3)
+}
+
+fn wrongArityNone() -> Unit {
+    xs = [1]
+    ys = xs.append()
+}
+
+fn appendOnNonList(u: User) -> Unit {
+    v = u.append(1)
+}
+
+fn appendOnPrimitive() -> Unit {
+    n = 1
+    v = n.append(2)
+}
+
+// A member receiver never takes the generic-call branch, so this reads as a
+// comparison chain and is rejected as one. Either way, it is not a call.
+fn typeArgumentsOnAppend() -> Unit {
+    xs = [1]
+    ys = xs.append<Int>(2)
+}
+
+fn recordElementMismatch() -> Unit {
+    xs = [User { name: "a" }]
+    ys = xs.append(1)
+}
+
+fn nestedElementMismatch() -> Unit {
+    xs: List<List<Int>> = [[1]]
+    ys = xs.append(2)
+}

@@ -2465,8 +2465,8 @@ export class Checker {
     const element = this.isList(receiver.type) ? receiver.type.arguments[0] ?? ErrorType : ErrorType;
     const name = callee.name;
 
-    if (name !== "length" && name !== "isEmpty" && name !== "get") {
-      this.unknownMember(typeName(receiver.type), "operation", name, callee.nameSpan, ["length", "isEmpty", "get"], callee.nameSpan);
+    if (name !== "length" && name !== "isEmpty" && name !== "get" && name !== "append") {
+      this.unknownMember(typeName(receiver.type), "operation", name, callee.nameSpan, ["length", "isEmpty", "get", "append"], callee.nameSpan);
       for (const argument of expression.args) this.checkExpression(argument, null);
       return this.errorValue(span);
     }
@@ -2482,22 +2482,39 @@ export class Checker {
       return this.errorValue(span);
     }
 
-    const wanted = name === "get" ? 1 : 0;
+    const wanted = name === "get" || name === "append" ? 1 : 0;
     if (expression.args.length !== wanted) {
       this.diagnostics.add({
         code: Codes.ArgumentCount,
         message: `'${name}' takes ${wanted} argument${wanted === 1 ? "" : "s"}, but ${expression.args.length} ${expression.args.length === 1 ? "was" : "were"} given`,
         span,
         label: `this call passes ${expression.args.length}`,
-        notes: name === "get" ? ["write `items.get(index)`, where index is an Int"] : [`write \`items.${name}()\``],
+        notes: name === "get"
+          ? ["write `items.get(index)`, where index is an Int"]
+          : name === "append"
+            ? [`write \`items.append(value)\`, where value is ${typeName(element)}`]
+            : [`write \`items.${name}()\``],
       });
       for (const argument of expression.args) this.checkExpression(argument, null);
       return this.errorValue(span);
     }
 
-    if (name !== "get") {
+    if (name === "length" || name === "isEmpty") {
       const type = name === "length" ? IntType : BoolType;
       return { kind: "list-op", operation: name, target: receiver, index: null, type, span };
+    }
+
+    if (name === "append") {
+      // Slice 6A: persistent. The result is a new List<T>; the receiver is
+      // never changed. The argument is checked against the instantiated
+      // element type, so ordinary contextual rules reach it.
+      if (element.kind === "Error") return this.errorValue(span);
+      const elementType = this.supportedMemberType(element, span);
+      if (elementType.kind === "Error") return this.errorValue(span);
+      const value = this.checkExpression(expression.args[0]!, elementType);
+      this.expect(value, elementType, `'append' adds ${typeName(elementType)} values to this list`);
+      if (value.type.kind === "Error") return this.errorValue(span);
+      return { kind: "list-op", operation: "append", target: receiver, index: value, type: receiver.type, span };
     }
 
     const index = this.checkExpression(expression.args[0]!, IntType);
@@ -2509,6 +2526,76 @@ export class Checker {
     const type = this.supportedMemberType(nullableType(element), span);
     if (type.kind === "Error") return this.errorValue(span);
     return { kind: "list-op", operation: "get", target: receiver, index, type, span };
+  }
+
+  /**
+   * `text.length()`, `get`, `startsWith`, `endsWith` and `contains` (Slice 6B).
+   *
+   * Compiler-known and read-only. Every one counts Unicode scalar values, not
+   * UTF-16 code units, and `get` returns `String?` because an index naming no
+   * scalar is an absent value rather than a failed operation.
+   */
+  private checkStringOperation(
+    receiver: IRExpression,
+    callee: Extract<Expression, { kind: "member" }>,
+    expression: Extract<Expression, { kind: "call" }>,
+    span: Span,
+  ): IRExpression {
+    const name = callee.name;
+    const predicates = new Set(["startsWith", "endsWith", "contains"]);
+    const known = name === "length" || name === "get" || predicates.has(name);
+
+    if (!known) {
+      this.unknownMember("String", "operation", name, callee.nameSpan, ["length", "get", "startsWith", "endsWith", "contains"], callee.nameSpan);
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
+
+    if (callee.typeArguments !== null) {
+      this.diagnostics.add({
+        code: Codes.TypeArgumentCount,
+        message: `'${name}' does not accept type arguments`,
+        span,
+        label: "a string operation takes none",
+      });
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
+
+    const wanted = name === "length" ? 0 : 1;
+    if (expression.args.length !== wanted) {
+      this.diagnostics.add({
+        code: Codes.ArgumentCount,
+        message: `'${name}' takes ${wanted} argument${wanted === 1 ? "" : "s"}, but ${expression.args.length} ${expression.args.length === 1 ? "was" : "were"} given`,
+        span,
+        label: `this call passes ${expression.args.length}`,
+        notes: name === "length"
+          ? ["write `text.length()`"]
+          : name === "get"
+            ? ["write `text.get(index)`, where index is an Int"]
+            : [`write \`text.${name}(value)\`, where value is a String`],
+      });
+      for (const argument of expression.args) this.checkExpression(argument, null);
+      return this.errorValue(span);
+    }
+
+    if (name === "length") {
+      return { kind: "string-op", operation: "length", target: receiver, argument: null, type: IntType, span };
+    }
+
+    if (name === "get") {
+      const index = this.checkExpression(expression.args[0]!, IntType);
+      this.expect(index, IntType, "a string index is an Int");
+      if (index.type.kind === "Error") return this.errorValue(span);
+      // One scalar value, or absence when the index names none (ADR 0007).
+      return { kind: "string-op", operation: "get", target: receiver, argument: index, type: nullableType(StringType), span };
+    }
+
+    const value = this.checkExpression(expression.args[0]!, StringType);
+    this.expect(value, StringType, `'${name}' compares String values`);
+    if (value.type.kind === "Error") return this.errorValue(span);
+    const operation = name === "startsWith" ? "startsWith" : name === "endsWith" ? "endsWith" : "contains";
+    return { kind: "string-op", operation, target: receiver, argument: value, type: BoolType, span };
   }
 
   /** `value.name(...)` where `value` is not a list and holds no function. */
@@ -2551,6 +2638,9 @@ export class Checker {
         const receiver = this.checkExpression(callee.target, null);
         if (this.isList(receiver.type)) {
           return this.checkListOperation(receiver, callee, expression, expression.span);
+        }
+        if (receiver.type.kind === "String") {
+          return this.checkStringOperation(receiver, callee, expression, expression.span);
         }
         if (receiver.type.kind !== "Error") {
           return this.checkNonListMemberCall(receiver, callee, expression);
